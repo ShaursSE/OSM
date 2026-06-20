@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSM — On-Screen Marking</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0e1117;
+    --surface: #161b27;
+    --panel: #1c2333;
+    --border: #2a3450;
+    --accent: #00d4aa;
+    --accent2: #4f8ef7;
+    --danger: #ff4757;
+    --warn: #ffa502;
+    --success: #2ed573;
+    --text: #e8eaf0;
+    --text-dim: #7a8499;
+    --tick-color: #00c896;
+    --cross-color: #ff4757;
+    --blank-color: #ff4757;
+    --rough-color: #ff6b35;
+    --font-main: 'Sora', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-main);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: 13px;
+  }
+
+  /* TOP BAR */
+  #topbar {
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-right: 8px;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+
+  .top-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .top-btn:hover { background: var(--border); border-color: var(--accent); }
+  .top-btn svg { flex-shrink: 0; }
+
+  #subject-label {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  #subject-label input {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--font-main);
+    font-size: 12px;
+    font-weight: 500;
+    width: 180px;
+    outline: none;
+  }
+
+  .spacer { flex: 1; }
+
+  /* MAIN LAYOUT */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* LEFT PANEL */
+  #left-panel {
+    width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  #left-panel-header {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  #left-panel-header span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+
+  .panel-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .panel-btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  #q-table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  #q-table-wrap::-webkit-scrollbar { width: 4px; }
+  #q-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .q-table { width: 100%; border-collapse: collapse; }
+  .q-table thead th {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: sticky; top: 0;
+    background: var(--surface);
+    z-index: 1;
+  }
+  .q-table tbody tr {
+    border-bottom: 1px solid rgba(42,52,80,0.4);
+    transition: background 0.1s;
+  }
+  .q-table tbody tr:hover { background: rgba(79,142,247,0.05); }
+  .q-table td { padding: 5px 6px; text-align: center; vertical-align: middle; }
+
+  .q-num { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); font-weight: 600; }
+
+  .q-input {
+    width: 46px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 3px 4px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .q-input:focus { border-color: var(--accent2); }
+  .q-input.marks-allocated { color: var(--accent); font-weight: 600; }
+
+  .q-del-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .q-del-btn:hover { color: var(--danger); background: rgba(255,71,87,0.1); }
+
+  #left-panel-footer {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel);
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  .total-row .label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .total-row .val { font-family: var(--font-mono); font-size: 14px; color: var(--accent); font-weight: 700; }
+
+  .add-q-btn {
+    background: rgba(0,212,170,0.1);
+    border: 1px dashed var(--accent);
+    color: var(--accent);
+    padding: 7px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .add-q-btn:hover { background: rgba(0,212,170,0.2); }
+
+  /* CENTER VIEWER */
+  #center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Scrollable PDF area */
+  #canvas-wrap {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    position: relative;
+    background: #13171f;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  #canvas-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+  #canvas-wrap::-webkit-scrollbar-track { background: #0e1117; }
+  #canvas-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  #canvas-wrap::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* Empty state floats in center */
+  #empty-state {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+  #empty-state .big-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.3; }
+  #empty-state h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; opacity: 0.7; }
+  #empty-state p { font-size: 13px; opacity: 0.5; }
+
+  /* Each page is a separate container */
+  .page-wrapper {
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 6px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: visible;
+    cursor: crosshair;
+    background: #fff;
+  }
+
+  .page-canvas { display: block; }
+
+  .ann-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* SVG annotations */
+  .annotation-group { pointer-events: all; cursor: default; }
+  .annotation-group:hover .ann-delete { opacity: 1; }
+  .ann-delete { cursor: pointer; opacity: 0; transition: opacity 0.15s; }
+
+  /* BOTTOM BAR */
+  #bottombar {
+    height: 54px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  #page-nav {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    flex: 1;
+    padding: 4px 0;
+  }
+  #page-nav::-webkit-scrollbar { height: 3px; }
+  #page-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .page-thumb {
+    min-width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+    background: var(--panel);
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .page-thumb.unvisited { background: rgba(255,71,87,0.15); color: var(--danger); border-color: rgba(255,71,87,0.3); }
+  .page-thumb.visited { background: rgba(46,213,115,0.12); color: var(--success); border-color: rgba(46,213,115,0.3); }
+  .page-thumb.current { border-color: var(--accent) !important; color: var(--accent) !important; background: rgba(0,212,170,0.12) !important; }
+  .page-thumb:hover { border-color: var(--accent2); }
+
+  #page-counter {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .zoom-btn {
+    width: 32px; height: 32px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .zoom-btn:hover { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+  #zoom-display {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 44px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  /* TOOLBAR */
+  #toolbar {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    padding-left: 10px;
+  }
+
+  .tool-btn {
+    padding: 6px 12px;
+    background: var(--panel);
+    border: 2px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tool-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .tool-btn.active { border-color: var(--accent); background: rgba(0,212,170,0.12); color: var(--accent); }
+  .tool-btn.tool-tick.active  { border-color: var(--tick-color);  background: rgba(0,200,150,0.12);  color: var(--tick-color); }
+  .tool-btn.tool-cross.active { border-color: var(--cross-color); background: rgba(255,71,87,0.12);  color: var(--cross-color); }
+  .tool-btn.tool-blank.active { border-color: var(--blank-color); background: rgba(255,71,87,0.12);  color: var(--blank-color); }
+  .tool-btn.tool-rough.active { border-color: var(--rough-color); background: rgba(255,107,53,0.12); color: var(--rough-color); }
+  .tool-btn.tool-delete.active{ border-color: var(--danger);      background: rgba(255,71,87,0.12);  color: var(--danger); }
+
+  /* CURSOR per tool */
+  body[data-tool="tick"]   .page-wrapper { cursor: copy; }
+  body[data-tool="cross"]  .page-wrapper { cursor: crosshair; }
+  body[data-tool="blank"]  .page-wrapper { cursor: cell; }
+  body[data-tool="rough"]  .page-wrapper { cursor: cell; }
+  body[data-tool="delete"] .page-wrapper { cursor: not-allowed; }
+
+  /* MARK DROPDOWN */
+  #mark-dropdown {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    z-index: 1000;
+    min-width: 130px;
+    overflow: hidden;
+    display: none;
+  }
+  #mark-dropdown .dd-header {
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .dd-item {
+    padding: 8px 14px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+  }
+  .dd-item:hover { background: rgba(0,212,170,0.1); color: var(--accent); }
+  .dd-item .dd-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  /* MODAL */
+  #modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 500;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  #modal-overlay.show { display: flex; }
+
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    width: 380px;
+    box-shadow: var(--shadow);
+  }
+  .modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .modal-choice { display: flex; flex-direction: column; gap: 10px; }
+  .modal-choice-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.15s;
+  }
+  .modal-choice-btn:hover { border-color: var(--accent); background: rgba(0,212,170,0.08); }
+  .modal-choice-btn .mc-icon { font-size: 22px; }
+  .modal-choice-btn .mc-label { font-weight: 600; }
+  .modal-choice-btn .mc-sub { font-size: 11px; color: var(--text-dim); font-weight: 400; }
+  .modal-cancel {
+    background: transparent; border: none; color: var(--text-dim);
+    cursor: pointer; font-family: var(--font-main); font-size: 12px;
+    padding: 8px; margin-top: 8px; text-align: center; width: 100%;
+    transition: color 0.15s;
+  }
+  .modal-cancel:hover { color: var(--text); }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 70px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 12px; font-weight: 500;
+    z-index: 2000; opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* PROGRESS BAR */
+  #progress-bar {
+    position: fixed; top: 0; left: 0;
+    height: 3px; background: var(--accent);
+    width: 0%; z-index: 9999; transition: width 0.3s;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .spinner {
+    display: inline-block; width: 18px; height: 18px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .top-field {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 5px 10px; border-radius: var(--radius);
+    font-size: 11px; color: var(--text-dim);
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .top-field span { flex-shrink: 0; }
+  .top-field input {
+    background: transparent; border: none; color: var(--text);
+    font-family: var(--font-main); font-size: 12px; font-weight: 500;
+    outline: none; width: 120px;
+  }
+  .form-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .form-row label { font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.7px; }
+  .form-row input, .form-row textarea {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 12px; border-radius: var(--radius); font-family: var(--font-main);
+    font-size: 13px; outline: none; transition: border-color 0.15s; width: 100%;
+  }
+  .form-row input:focus, .form-row textarea:focus { border-color: var(--accent); }
+  .form-row textarea { resize: vertical; min-height: 90px; }
+  .form-row-2col { display: flex; gap: 10px; }
+  .form-row-2col .form-row { flex: 1; margin-bottom: 0; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .modal-actions button { flex: 1; }
+  .btn-primary {
+    background: var(--accent); color: #000; border: none; padding: 10px;
+    border-radius: var(--radius); font-family: var(--font-main); font-size: 13px;
+    font-weight: 700; cursor: pointer; transition: filter 0.15s;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-secondary {
+    background: var(--panel); color: var(--text-dim); border: 1px solid var(--border);
+    padding: 10px; border-radius: var(--radius); font-family: var(--font-main);
+    font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+  #remarks-modal .modal-box { width: 460px; }
+  .modal-sub { font-size: 11px; color: var(--text-dim); margin-bottom: 18px; }
+</style>
+</head>
+<body data-tool="tick">
+
+<div id="progress-bar"></div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">OSM</div>
+
+  <div class="top-field">
+    <span>📋</span>
+    <input type="text" id="exam-name-input" placeholder="Exam name…">
+  </div>
+
+  <div class="top-field">
+    <span>🔖</span>
+    <input type="text" id="paper-code-input" placeholder="Paper code…">
+  </div>
+
+  <div class="top-field">
+    <span>📚</span>
+    <input type="text" id="subject-input" placeholder="Subject name…" value="Chemistry — Set 1">
+  </div>
+
+  <button class="top-btn" onclick="openLoadModal()">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    Load PDF
+  </button>
+
+  <div class="spacer"></div>
+
+  <button class="top-btn" onclick="openRemarksModal()" id="export-btn">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    Export PDF
+  </button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT PANEL -->
+  <div id="left-panel">
+    <div id="left-panel-header">
+      <span>Question Marks</span>
+      <button class="panel-btn" title="Add question" onclick="addQuestion()">+</button>
+    </div>
+
+    <div id="q-table-wrap">
+      <table class="q-table">
+        <thead>
+          <tr>
+            <th>Q.No.</th>
+            <th>Max</th>
+            <th>Marks</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="q-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="left-panel-footer">
+      <div class="total-row">
+        <span class="label">Total Marks</span>
+        <span class="val" id="total-display">0 / 0</span>
+      </div>
+      <button class="add-q-btn" onclick="addQuestion()">+ Add Question</button>
+    </div>
+  </div>
+
+  <!-- CENTER VIEWER -->
+  <div id="center">
+    <div id="canvas-wrap" id="canvas-wrap">
+      <div id="empty-state">
+        <div class="big-icon">📄</div>
+        <h2>No PDF Loaded</h2>
+        <p>Click "Load PDF" to get started</p>
+      </div>
+      <!-- Page wrappers are injected here by JS -->
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div id="bottombar">
+      <div id="page-nav"></div>
+      <div id="page-counter">— / —</div>
+      <button class="zoom-btn" onclick="doZoom(-0.1)" title="Zoom out">−</button>
+      <div id="zoom-display">100%</div>
+      <button class="zoom-btn" onclick="doZoom(+0.1)" title="Zoom in">+</button>
+
+      <div id="toolbar">
+        <button class="tool-btn tool-tick active" data-tool="tick" onclick="selectTool('tick')">✓ Tick</button>
+        <button class="tool-btn tool-cross" data-tool="cross" onclick="selectTool('cross')">✗ Cross</button>
+        <button class="tool-btn tool-blank" data-tool="blank" onclick="selectTool('blank')">⬜ Blank</button>
+        <button class="tool-btn tool-rough" data-tool="rough" onclick="selectTool('rough')">📝 Rough</button>
+        <button class="tool-btn tool-delete" data-tool="delete" onclick="selectTool('delete')">🗑 Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MARK DROPDOWN -->
+<div id="mark-dropdown">
+  <div class="dd-header">Select Mark</div>
+</div>
+
+<!-- LOAD MODAL -->
+<div id="modal-overlay">
+  <div class="modal-box">
+    <h3>📂 Load Answer Sheet</h3>
+    <div class="modal-choice">
+      <label class="modal-choice-btn" for="file-input">
+        <span class="mc-icon">💻</span>
+        <div>
+          <div class="mc-label">Load from Desktop</div>
+          <div class="mc-sub">Select a PDF file from your computer</div>
+        </div>
+      </label>
+      <input type="file" id="file-input" accept=".pdf" style="display:none" onchange="loadFromFile(event)">
+
+      <button class="modal-choice-btn" onclick="loadFromDrive()">
+        <span class="mc-icon">
+          <svg width="22" height="22" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+            <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+            <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+            <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+            <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+            <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+            <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+          </svg>
+        </span>
+        <div>
+          <div class="mc-label">Load from Google Drive</div>
+          <div class="mc-sub">Requires Google API credentials</div>
+        </div>
+      </button>
+    </div>
+    <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+
+
+<!-- REMARKS MODAL -->
+<div id="remarks-modal" class="modal-overlay" style="display:none; align-items:center; justify-content:center;">
+  <div class="modal-box" style="width:480px;">
+    <h3>📄 Export Details</h3>
+    <p class="modal-sub">These details will appear on the cover page of your exported PDF.</p>
+
+    <div class="form-row-2col" style="display:flex;gap:10px;margin-bottom:14px;">
+      <div class="form-row" style="flex:1;margin-bottom:0;">
+        <label>Date of Examination</label>
+        <input type="text" id="exam-date-input" placeholder="e.g. 15 March 2025">
+      </div>
+      <div class="form-row" style="flex:1;margin-bottom:0;">
+        <label>Date of Evaluation</label>
+        <input type="text" id="eval-date-input" placeholder="e.g. 20 March 2025">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Remarks</label>
+      <textarea id="remarks-input" placeholder="Enter any remarks about this answer sheet…"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeRemarksModal()">Cancel</button>
+      <button class="btn-primary" onclick="doExportPDF()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="display:inline;vertical-align:middle;margin-right:5px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Export PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── STATE ────────────────────────────────────────────────
+const state = {
+  pdfDoc: null,
+  totalPages: 0,
+  scale: 1.0,            // base scale — will be fitted on load
+  visitedPages: new Set(),
+  annotations: {},       // pageNum -> [{type,x,y,mark,id}]
+  currentTool: 'tick',
+  questions: [],
+  nextQId: 1,
+  pending: null,         // {x,y,page} for tick dropdown
+};
+
+let annIdCounter = 0;
+const MARK_VALUES = [0.5,1,1.5,2,2.5,3,3.5,4,4.5,5];
+
+// Annotation sizes in PDF-space (NOT scaled). We draw them big enough
+// that they're clearly readable at normal zoom.
+const ANN = {
+  TICK_SIZE: 40,       // half-size of tick glyph in pdf-points
+  CIRCLE_R: 26,        // radius of mark circle
+  CIRCLE_FONT: 22,     // font size inside circle
+  CROSS_R: 28,         // radius of cross circle
+  CROSS_ARM: 18,       // arm length of X
+  STAMP_W: 260,        // stamp box width
+  STAMP_H: 80,         // stamp box height
+  STAMP_FONT: 28,      // stamp label font size
+  STROKE: 5,           // base stroke width
+};
+
+// ─── QUESTIONS ────────────────────────────────────────────
+function initQuestions(n=25){
+  state.questions=[];
+  for(let i=1;i<=n;i++) addQuestion(false);
+  renderQTable(); updateTotal();
+}
+
+function addQuestion(renderNow=true){
+  state.questions.push({id:state.nextQId++, label:`Q${state.questions.length+1}`, maxMarks:'', marks:''});
+  if(renderNow){renderQTable();updateTotal();}
+}
+
+function removeQuestion(id){
+  state.questions=state.questions.filter(q=>q.id!==id);
+  state.questions.forEach((q,i)=>q.label=`Q${i+1}`);
+  renderQTable(); updateTotal();
+}
+
+function renderQTable(){
+  const tb=document.getElementById('q-tbody');
+  tb.innerHTML='';
+  state.questions.forEach(q=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><span class="q-num">${q.label}</span></td>
+      <td><input class="q-input" type="number" min="0" step="0.5" value="${q.maxMarks}" placeholder="—"
+        onchange="updateQField(${q.id},'maxMarks',this.value)"></td>
+      <td><input class="q-input marks-allocated" type="number" min="0" step="0.5" value="${q.marks}" placeholder="—"
+        onchange="updateQField(${q.id},'marks',this.value)"></td>
+      <td><button class="q-del-btn" onclick="removeQuestion(${q.id})">×</button></td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+function updateQField(id,field,val){
+  const q=state.questions.find(x=>x.id===id);
+  if(q){q[field]=val;updateTotal();}
+}
+
+function updateTotal(){
+  let marks=0,max=0;
+  state.questions.forEach(q=>{
+    if(q.marks!=='') marks+=parseFloat(q.marks)||0;
+    if(q.maxMarks!=='') max+=parseFloat(q.maxMarks)||0;
+  });
+  const fmt=v=>v%1===0?v:v.toFixed(1);
+  document.getElementById('total-display').textContent=`${fmt(marks)} / ${fmt(max)}`;
+}
+
+// ─── MODAL ────────────────────────────────────────────────
+function openLoadModal(){ document.getElementById('modal-overlay').classList.add('show'); }
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('show'); }
+document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeModal(); });
+
+// ─── PDF LOADING ──────────────────────────────────────────
+async function loadFromFile(e){
+  closeModal();
+  const file=e.target.files[0]; if(!file)return;
+  showToast('Loading PDF…');
+  const buf=await file.arrayBuffer();
+  await loadPDF(buf);
+  e.target.value='';
+}
+
+async function loadFromDrive(){
+  closeModal();
+  if(typeof gapi==='undefined'){
+    showToast('Loading Google API…');
+    await loadScript('https://apis.google.com/js/api.js');
+  }
+  try{ await initDrivePicker(); }
+  catch(err){ showToast('⚠️ Google Drive needs API credentials in source.'); }
+}
+
+function loadScript(src){
+  return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+}
+
+async function initDrivePicker(){
+  const CLIENT_ID='YOUR_GOOGLE_CLIENT_ID';
+  const API_KEY='YOUR_GOOGLE_API_KEY';
+  const APP_ID='YOUR_APP_ID';
+  await new Promise(r=>gapi.load('picker',r));
+  await new Promise(r=>gapi.load('client:auth2',r));
+  await gapi.client.init({apiKey:API_KEY,clientId:CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.readonly'});
+  const auth=gapi.auth2.getAuthInstance();
+  if(!auth.isSignedIn.get()) await auth.signIn();
+  const token=auth.currentUser.get().getAuthResponse().access_token;
+  const picker=new google.picker.PickerBuilder()
+    .addView(new google.picker.View(google.picker.ViewId.DOCS).setMimeTypes('application/pdf'))
+    .setOAuthToken(token).setDeveloperKey(API_KEY).setAppId(APP_ID)
+    .setCallback(async data=>{
+      if(data.action===google.picker.Action.PICKED){
+        showToast('Downloading from Drive…');
+        const res=await fetch(`https://www.googleapis.com/drive/v3/files/${data.docs[0].id}?alt=media`,{headers:{Authorization:`Bearer ${token}`}});
+        await loadPDF(await res.arrayBuffer());
+      }
+    }).build();
+  picker.setVisible(true);
+}
+
+async function loadPDF(buf){
+  try{
+    setProgress(20);
+    state.annotations={}; state.visitedPages=new Set();
+    // Clear old pages
+    const wrap=document.getElementById('canvas-wrap');
+    wrap.querySelectorAll('.page-wrapper').forEach(el=>el.remove());
+    document.getElementById('empty-state').style.display='none';
+
+    const task=pdfjsLib.getDocument({data:buf});
+    task.onProgress=p=>{ if(p.total) setProgress(20+60*p.loaded/p.total); };
+    state.pdfDoc=await task.promise;
+    state.totalPages=state.pdfDoc.numPages;
+
+    // Compute fit-width scale using first page
+    const firstPage=await state.pdfDoc.getPage(1);
+    const vp0=firstPage.getViewport({scale:1});
+    const availW=wrap.clientWidth - 48; // 2*24 padding
+    state.scale=Math.min(1.6, availW/vp0.width);
+
+    setProgress(85);
+    buildPageNav();
+    await renderAllPages();
+    updateZoomDisplay();
+    setProgress(100);
+    setTimeout(()=>setProgress(0),600);
+    showToast(`✅ Loaded ${state.totalPages} page${state.totalPages>1?'s':''}`);
+
+    // Scroll to top
+    wrap.scrollTop=0;
+
+    // Intersection observer for visited tracking
+    setupVisibilityObserver();
+  }catch(err){
+    console.error(err);
+    showToast('❌ Failed to load PDF');
+    setProgress(0);
+  }
+}
+
+// ─── RENDER ALL PAGES ─────────────────────────────────────
+async function renderAllPages(){
+  const wrap=document.getElementById('canvas-wrap');
+  wrap.querySelectorAll('.page-wrapper').forEach(el=>el.remove());
+
+  for(let p=1;p<=state.totalPages;p++){
+    const page=await state.pdfDoc.getPage(p);
+    const vp=page.getViewport({scale:state.scale});
+
+    // Wrapper div
+    const wrapper=document.createElement('div');
+    wrapper.className='page-wrapper';
+    wrapper.dataset.page=p;
+    wrapper.style.width=vp.width+'px';
+    wrapper.style.height=vp.height+'px';
+
+    // Canvas
+    const canvas=document.createElement('canvas');
+    canvas.className='page-canvas';
+    canvas.width=vp.width;
+    canvas.height=vp.height;
+    const ctx=canvas.getContext('2d');
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    wrapper.appendChild(canvas);
+
+    // SVG annotation layer
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('class','ann-svg');
+    svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
+    svg.setAttribute('width',vp.width);
+    svg.setAttribute('height',vp.height);
+    svg.setAttribute('viewBox',`0 0 ${vp.width} ${vp.height}`);
+    wrapper.appendChild(svg);
+
+    // Events on each page
+    wrapper.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      if(state.currentTool!=='tick') return;
+      const rect=canvas.getBoundingClientRect();
+      const x=(e.clientX-rect.left)/state.scale;
+      const y=(e.clientY-rect.top)/state.scale;
+      state.pending={x,y,page:p};
+      showMarkDropdown(e.clientX,e.clientY);
+    });
+
+    wrapper.addEventListener('click',e=>{
+      hideDropdown();
+      if(e.target.closest('.ann-delete')) return;
+      const rect=canvas.getBoundingClientRect();
+      const x=(e.clientX-rect.left)/state.scale;
+      const y=(e.clientY-rect.top)/state.scale;
+      if(state.currentTool==='cross')  addAnnotation({type:'cross',x,y,page:p});
+      if(state.currentTool==='blank')  addAnnotation({type:'blank',x,y,page:p});
+      if(state.currentTool==='rough')  addAnnotation({type:'rough',x,y,page:p});
+    });
+
+    wrap.appendChild(wrapper);
+    setProgress(85 + 15*(p/state.totalPages));
+
+    // Draw any existing annotations (e.g. after zoom re-render)
+    renderAnnotationsForPage(p);
+  }
+}
+
+// ─── ZOOM ─────────────────────────────────────────────────
+async function doZoom(delta){
+  if(!state.pdfDoc) return;
+  state.scale=Math.max(0.3,Math.min(3.0,state.scale+delta));
+  updateZoomDisplay();
+  // Re-render all pages at new scale
+  const wrap=document.getElementById('canvas-wrap');
+  const scrollFrac=wrap.scrollTop/(wrap.scrollHeight||1);
+
+  for(let p=1;p<=state.totalPages;p++){
+    const wrapper=wrap.querySelector(`.page-wrapper[data-page="${p}"]`);
+    if(!wrapper) continue;
+    const page=await state.pdfDoc.getPage(p);
+    const vp=page.getViewport({scale:state.scale});
+    wrapper.style.width=vp.width+'px';
+    wrapper.style.height=vp.height+'px';
+    const canvas=wrapper.querySelector('canvas');
+    canvas.width=vp.width; canvas.height=vp.height;
+    const ctx=canvas.getContext('2d');
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    const svg=wrapper.querySelector('svg');
+    svg.setAttribute('width',vp.width);
+    svg.setAttribute('height',vp.height);
+    svg.setAttribute('viewBox',`0 0 ${vp.width} ${vp.height}`);
+    renderAnnotationsForPage(p);
+  }
+
+  wrap.scrollTop=scrollFrac*wrap.scrollHeight;
+}
+
+function updateZoomDisplay(){
+  // Show as % relative to 1.0 base
+  document.getElementById('zoom-display').textContent=Math.round(state.scale*100)+'%';
+}
+
+// ─── VISIBILITY OBSERVER (visited pages) ──────────────────
+function setupVisibilityObserver(){
+  const wrap=document.getElementById('canvas-wrap');
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const p=parseInt(en.target.dataset.page);
+        if(!state.visitedPages.has(p)){
+          state.visitedPages.add(p);
+          updatePageNav();
+        }
+        // Update page counter with most visible page
+        updatePageCounter(p);
+      }
+    });
+  },{root:wrap, threshold:0.3});
+
+  wrap.querySelectorAll('.page-wrapper').forEach(w=>obs.observe(w));
+}
+
+// ─── PAGE NAV ─────────────────────────────────────────────
+function buildPageNav(){
+  const nav=document.getElementById('page-nav');
+  nav.innerHTML='';
+  for(let i=1;i<=state.totalPages;i++){
+    const btn=document.createElement('div');
+    btn.className='page-thumb unvisited';
+    btn.textContent=i;
+    btn.dataset.page=i;
+    btn.onclick=()=>scrollToPage(i);
+    nav.appendChild(btn);
+  }
+  updatePageCounter(1);
+}
+
+function scrollToPage(p){
+  const wrap=document.getElementById('canvas-wrap');
+  const el=wrap.querySelector(`.page-wrapper[data-page="${p}"]`);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function updatePageNav(){
+  document.querySelectorAll('.page-thumb').forEach(btn=>{
+    const p=parseInt(btn.dataset.page);
+    btn.className='page-thumb';
+    if(state.visitedPages.has(p)) btn.classList.add('visited');
+    else btn.classList.add('unvisited');
+  });
+}
+
+function updatePageCounter(p){
+  document.getElementById('page-counter').textContent=`${p} / ${state.totalPages}`;
+}
+
+// ─── TOOLS ────────────────────────────────────────────────
+function selectTool(tool){
+  state.currentTool=tool;
+  document.body.dataset.tool=tool;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
+  hideDropdown();
+}
+
+// ─── MARK DROPDOWN ────────────────────────────────────────
+function buildDropdownItems(){
+  const dd=document.getElementById('mark-dropdown');
+  while(dd.children.length>1) dd.removeChild(dd.lastChild);
+  MARK_VALUES.forEach(v=>{
+    const item=document.createElement('div');
+    item.className='dd-item';
+    item.innerHTML=`<span class="dd-dot"></span> ${v}`;
+    item.onclick=()=>{
+      if(state.pending){
+        addAnnotation({type:'tick',x:state.pending.x,y:state.pending.y,page:state.pending.page,mark:v});
+      }
+      hideDropdown();
+    };
+    dd.appendChild(item);
+  });
+}
+
+function showMarkDropdown(cx,cy){
+  buildDropdownItems();
+  const dd=document.getElementById('mark-dropdown');
+  dd.style.display='block';
+  let left=cx+4, top=cy+4;
+  dd.style.left=left+'px'; dd.style.top=top+'px';
+  requestAnimationFrame(()=>{
+    const r=dd.getBoundingClientRect();
+    if(r.right>window.innerWidth) dd.style.left=(cx-r.width-4)+'px';
+    if(r.bottom>window.innerHeight) dd.style.top=(cy-r.height-4)+'px';
+  });
+}
+
+function hideDropdown(){
+  document.getElementById('mark-dropdown').style.display='none';
+  state.pending=null;
+}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#mark-dropdown')&&!e.target.closest('.page-wrapper')) hideDropdown();
+});
+
+// ─── ANNOTATIONS ──────────────────────────────────────────
+function addAnnotation(ann){
+  ann.id=++annIdCounter;
+  if(!state.annotations[ann.page]) state.annotations[ann.page]=[];
+  state.annotations[ann.page].push(ann);
+  renderAnnotationsForPage(ann.page);
+}
+
+function deleteAnnotation(id,page){
+  if(state.annotations[page])
+    state.annotations[page]=state.annotations[page].filter(a=>a.id!==id);
+  renderAnnotationsForPage(page);
+}
+
+function renderAnnotationsForPage(pageNum){
+  const wrap=document.getElementById('canvas-wrap');
+  const wrapper=wrap.querySelector(`.page-wrapper[data-page="${pageNum}"]`);
+  if(!wrapper) return;
+  const svg=wrapper.querySelector('svg');
+  svg.innerHTML='';
+
+  const anns=state.annotations[pageNum]||[];
+  const s=state.scale;
+
+  anns.forEach(ann=>{
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','annotation-group');
+
+    const cx=ann.x*s, cy=ann.y*s;
+
+    if(ann.type==='tick')  drawTick(g,cx,cy,ann.mark,s);
+    if(ann.type==='cross') drawCross(g,cx,cy,s);
+    if(ann.type==='blank') drawStamp(g,cx,cy,'BLANK PAGE','#ff4757',s);
+    if(ann.type==='rough') drawStamp(g,cx,cy,'ROUGH WORK','#ff6b35',s);
+
+    // Delete button
+    const dg=document.createElementNS('http://www.w3.org/2000/svg','g');
+    dg.setAttribute('class','ann-delete');
+    // Position delete button top-right of annotation
+    const delOX = (ann.type==='tick') ? cx + ANN.TICK_SIZE*s + ANN.CIRCLE_R*s + 14
+                : (ann.type==='cross') ? cx + ANN.CROSS_R*s + 14
+                : cx + ANN.STAMP_W/2*s + 8;
+    const delOY = (ann.type==='tick') ? cy - ANN.TICK_SIZE*0.5*s - ANN.CIRCLE_R*s - 8
+                : (ann.type==='cross') ? cy - ANN.CROSS_R*s - 8
+                : cy - ANN.STAMP_H/2*s - 8;
+    dg.setAttribute('transform',`translate(${delOX},${delOY})`);
+    const dc=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dc.setAttribute('r','11'); dc.setAttribute('fill','#ff4757');
+    dc.setAttribute('stroke','#fff'); dc.setAttribute('stroke-width','1.5');
+    dg.appendChild(dc);
+    const dt=document.createElementNS('http://www.w3.org/2000/svg','text');
+    dt.setAttribute('text-anchor','middle'); dt.setAttribute('dominant-baseline','central');
+    dt.setAttribute('fill','#fff'); dt.setAttribute('font-size','13'); dt.setAttribute('font-weight','bold');
+    dt.textContent='×';
+    dg.appendChild(dt);
+    dg.style.cursor='pointer';
+    const annId=ann.id, pg=ann.page;
+    dg.addEventListener('click',ev=>{ ev.stopPropagation(); deleteAnnotation(annId,pg); });
+    g.appendChild(dg);
+
+    svg.appendChild(g);
+  });
+}
+
+// Draw tick: annotations are drawn in SVG-space (already scaled by s)
+// Tick: checkmark on the left, solid filled circle with mark to the right — clearly separated
+function drawTick(g,cx,cy,mark,s){
+  const sz=ANN.TICK_SIZE*s;
+  const sw=ANN.STROKE*s;
+  const r=ANN.CIRCLE_R*s;
+
+  // Thick checkmark
+  const tick=makeSVG('polyline');
+  tick.setAttribute('points',`${cx-sz*0.55},${cy+sz*0.05} ${cx-sz*0.05},${cy+sz*0.6} ${cx+sz*0.75},${cy-sz*0.65}`);
+  tick.setAttribute('stroke','#00c896');
+  tick.setAttribute('stroke-width',sw);
+  tick.setAttribute('fill','none');
+  tick.setAttribute('stroke-linecap','round');
+  tick.setAttribute('stroke-linejoin','round');
+  g.appendChild(tick);
+
+  // Circle sits to the RIGHT of the tick with a gap — no overlap at all
+  // Rightmost tick point is cx+sz*0.75, so circle centre = that + gap(12px) + r
+  const ox = cx + sz*0.75 + 12*s + r;
+  const oy = cy;  // vertically centred on the click point
+
+  const circ=makeSVG('circle');
+  circ.setAttribute('cx',ox); circ.setAttribute('cy',oy); circ.setAttribute('r',r);
+  circ.setAttribute('fill','#00c896');          // solid fill so text is always readable
+  circ.setAttribute('stroke','#006e50');
+  circ.setAttribute('stroke-width',sw*0.5);
+  g.appendChild(circ);
+
+  const txt=makeSVG('text');
+  txt.setAttribute('x',ox); txt.setAttribute('y',oy);
+  txt.setAttribute('text-anchor','middle');
+  txt.setAttribute('dominant-baseline','central');
+  txt.setAttribute('fill','#ffffff');            // white text on solid green = always visible
+  txt.setAttribute('font-size',ANN.CIRCLE_FONT*s);
+  txt.setAttribute('font-weight','800');
+  txt.setAttribute('font-family','JetBrains Mono, monospace');
+  txt.textContent=String(mark);
+  g.appendChild(txt);
+}
+
+function drawCross(g,cx,cy,s){
+  const r=ANN.CROSS_R*s;
+  const arm=ANN.CROSS_ARM*s;
+  const sw=ANN.STROKE*s;
+
+  const circ=makeSVG('circle');
+  circ.setAttribute('cx',cx); circ.setAttribute('cy',cy); circ.setAttribute('r',r);
+  circ.setAttribute('fill','rgba(255,71,87,0.1)');
+  circ.setAttribute('stroke','#ff4757');
+  circ.setAttribute('stroke-width',sw*0.7);
+  g.appendChild(circ);
+
+  [[-1,-1,1,1],[1,-1,-1,1]].forEach(([x1,y1,x2,y2])=>{
+    const l=makeSVG('line');
+    l.setAttribute('x1',cx+x1*arm); l.setAttribute('y1',cy+y1*arm);
+    l.setAttribute('x2',cx+x2*arm); l.setAttribute('y2',cy+y2*arm);
+    l.setAttribute('stroke','#ff4757'); l.setAttribute('stroke-width',sw);
+    l.setAttribute('stroke-linecap','round');
+    g.appendChild(l);
+  });
+
+  // "0" label next to circle
+  const txt=makeSVG('text');
+  txt.setAttribute('x',cx+r+8*s); txt.setAttribute('y',cy-r+4*s);
+  txt.setAttribute('fill','#ff4757');
+  txt.setAttribute('font-size',ANN.CIRCLE_FONT*s);
+  txt.setAttribute('font-weight','800');
+  txt.setAttribute('font-family','JetBrains Mono, monospace');
+  txt.textContent='0';
+  g.appendChild(txt);
+}
+
+function drawStamp(g,cx,cy,label,color,s){
+  const bw=ANN.STAMP_W*s, bh=ANN.STAMP_H*s;
+  const bx=cx-bw/2, by=cy-bh/2;
+  const corner=8*s;
+  const sw=ANN.STROKE*s;
+
+  // Outer double-border effect
+  const outer=makeSVG('rect');
+  outer.setAttribute('x',bx-5*s); outer.setAttribute('y',by-5*s);
+  outer.setAttribute('width',bw+10*s); outer.setAttribute('height',bh+10*s);
+  outer.setAttribute('rx',corner+4*s);
+  outer.setAttribute('fill','none');
+  outer.setAttribute('stroke',color);
+  outer.setAttribute('stroke-width',sw*0.5);
+  outer.setAttribute('opacity','0.45');
+  g.appendChild(outer);
+
+  // Main box
+  const rect=makeSVG('rect');
+  rect.setAttribute('x',bx); rect.setAttribute('y',by);
+  rect.setAttribute('width',bw); rect.setAttribute('height',bh);
+  rect.setAttribute('rx',corner);
+  rect.setAttribute('fill',color+'22');
+  rect.setAttribute('stroke',color);
+  rect.setAttribute('stroke-width',sw);
+  g.appendChild(rect);
+
+  // Label
+  const txt=makeSVG('text');
+  txt.setAttribute('x',cx); txt.setAttribute('y',cy);
+  txt.setAttribute('text-anchor','middle');
+  txt.setAttribute('dominant-baseline','central');
+  txt.setAttribute('fill',color);
+  txt.setAttribute('font-size',ANN.STAMP_FONT*s);
+  txt.setAttribute('font-weight','800');
+  txt.setAttribute('font-family','Sora, sans-serif');
+  txt.setAttribute('letter-spacing','2');
+  txt.textContent=label;
+  g.appendChild(txt);
+}
+
+function makeSVG(tag){
+  return document.createElementNS('http://www.w3.org/2000/svg',tag);
+}
+
+// ─── PDF EXPORT ───────────────────────────────────────────
+function openRemarksModal(){
+  if(!state.pdfDoc){ showToast('⚠️ No PDF loaded'); return; }
+  document.getElementById('remarks-modal').style.display='flex';
+}
+function closeRemarksModal(){
+  document.getElementById('remarks-modal').style.display='none';
+}
+document.getElementById('remarks-modal').addEventListener('click',e=>{
+  if(e.target===e.currentTarget) closeRemarksModal();
+});
+
+async function doExportPDF(){
+  closeRemarksModal();
+  const btn=document.getElementById('export-btn');
+  btn.innerHTML='<span class="spinner"></span> Exporting…'; btn.disabled=true;
+
+  try{
+    showToast('Building cover page…');
+    const {jsPDF}=window.jspdf;
+    const EXPORT_SCALE=2.0;
+
+    // Gather metadata
+    const examName  = (document.getElementById('exam-name-input').value||'').trim();
+    const paperCode = (document.getElementById('paper-code-input').value||'').trim();
+    const subject   = (document.getElementById('subject-input').value||'').trim();
+    const examDate  = (document.getElementById('exam-date-input').value||'').trim();
+    const evalDate  = (document.getElementById('eval-date-input').value||'').trim();
+    const remarks   = (document.getElementById('remarks-input').value||'').trim();
+
+    // Compute totals
+    let totalMarks=0, totalMax=0;
+    state.questions.forEach(q=>{
+      totalMarks += parseFloat(q.marks)||0;
+      totalMax   += parseFloat(q.maxMarks)||0;
+    });
+
+    // ── Render answer sheet pages ──
+    const pdfPages=[];
+    for(let p=1;p<=state.totalPages;p++){
+      const page=await state.pdfDoc.getPage(p);
+      const vp=page.getViewport({scale:EXPORT_SCALE});
+      const offCanvas=document.createElement('canvas');
+      offCanvas.width=vp.width; offCanvas.height=vp.height;
+      const ctx=offCanvas.getContext('2d');
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
+      const anns=state.annotations[p]||[];
+      if(anns.length){ ctx.save(); anns.forEach(ann=>drawAnnOnCanvas(ctx,ann,EXPORT_SCALE)); ctx.restore(); }
+      pdfPages.push(offCanvas);
+    }
+
+    // Cover page: A4 portrait (595.28 x 841.89 pt) — matches scanned answer sheet aspect
+    const PW = 595.28, PH = 841.89;
+
+    // ── Build jsPDF — first page is the cover, A4 portrait ──
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+    // ── COVER PAGE ──
+    buildCoverPage(doc, { examName, paperCode, subject, examDate, evalDate, remarks, totalMarks, totalMax, PW, PH });
+
+    // ── Answer sheet pages ──
+    pdfPages.forEach(canvas=>{
+      const pw=canvas.width/EXPORT_SCALE, ph=canvas.height/EXPORT_SCALE;
+      doc.addPage([pw,ph], pw>ph?'landscape':'portrait');
+      doc.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pw,ph);
+    });
+
+    const filename=(subject||examName||'AnswerSheet').replace(/\s+/g,'_')+'_Marked.pdf';
+    doc.save(filename);
+    showToast('✅ Export complete!');
+  }catch(err){
+    console.error(err);
+    showToast('❌ Export failed: '+err.message);
+  }
+  btn.innerHTML=`<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Export PDF`;
+  btn.disabled=false;
+}
+
+// ── COVER PAGE BUILDER ─────────────────────────────────────
+function buildCoverPage(doc, {examName, paperCode, subject, examDate, evalDate, remarks, totalMarks, totalMax, PW, PH}){
+  // A4 portrait: PW=595.28, PH=841.89
+  const M  = 48;          // left/right margin
+  const BLK = [0,0,0];    // pure black
+  const GRY = [100,100,100];
+  const GRN = [0,140,90]; // green for marks obtained
+  let y = M;
+
+  // ─── HEADER BLOCK ─────────────────────────────────────────
+  // Exam name — large, bold, centred
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(22);
+  doc.setTextColor(...BLK);
+  doc.text(examName || 'Examination', PW/2, y, {align:'center'});
+  y += 10;
+
+  // Decorative line under title
+  doc.setDrawColor(...BLK);
+  doc.setLineWidth(1.2);
+  const titleW = Math.min(doc.getTextWidth(examName||'Examination') + 40, PW - M*2);
+  doc.line(PW/2 - titleW/2, y, PW/2 + titleW/2, y);
+  y += 14;
+
+  // Paper code — centred, bold, medium
+  if(paperCode){
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...BLK);
+    doc.text('Paper Code: ' + paperCode, PW/2, y, {align:'center'});
+    y += 14;
+  }
+
+  // Subject — centred, normal
+  if(subject){
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...BLK);
+    doc.text('Subject: ' + subject, PW/2, y, {align:'center'});
+    y += 16;
+  }
+
+  // Date row — exam date left, eval date right
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...BLK);
+  const hasExamDate = !!(examDate && examDate.trim());
+  const hasEvalDate = !!(evalDate && evalDate.trim());
+  if(hasExamDate) doc.text('Date of Examination: ' + examDate, M, y);
+  if(hasEvalDate) doc.text('Date of Evaluation: ' + evalDate, PW-M, y, {align:'right'});
+  if(hasExamDate||hasEvalDate) y += 16;
+
+  // ─── FULL-WIDTH RULE ──────────────────────────────────────
+  doc.setDrawColor(...BLK);
+  doc.setLineWidth(0.7);
+  doc.line(M, y, PW-M, y);
+  y += 14;
+
+  // ─── QUESTION TABLE ───────────────────────────────────────
+  // Layout: 3 columns side by side, each holds up to 10 questions
+  // Columns separated by a light vertical rule
+  const qs      = state.questions;
+  const total   = qs.length;
+  const PER_COL = 10;
+  const NUM_COLS = Math.min(3, Math.ceil(total / PER_COL)); // max 3 visible cols
+  const USABLE  = PW - M*2;
+  const COL_W   = USABLE / NUM_COLS;
+  const ROW_H   = 17;
+  // Column sub-widths (within each column)
+  const Q_COL   = 34;   // Q.No
+  const MX_COL  = 38;   // Max Marks
+  const MK_COL  = 38;   // Marks Obtained
+
+  // Header
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...BLK);
+  for(let c=0;c<NUM_COLS;c++){
+    const x0 = M + c*COL_W;
+    doc.text('Q. No',       x0,            y);
+    doc.text('Max',         x0+Q_COL+MX_COL, y, {align:'right'});
+    doc.text('Obtained',    x0+Q_COL+MX_COL+MK_COL+6, y, {align:'right'});
+  }
+  y += 5;
+
+  // Thin rule under header
+  doc.setDrawColor(180,180,180);
+  doc.setLineWidth(0.3);
+  doc.line(M, y, PW-M, y);
+  y += 4;
+
+  const rowStartY = y;
+
+  // Rows
+  for(let c=0;c<NUM_COLS;c++){
+    const x0    = M + c*COL_W;
+    const slice = qs.slice(c*PER_COL, c*PER_COL+PER_COL);
+    let   ry    = rowStartY;
+    slice.forEach((q)=>{
+      const maxVal   = q.maxMarks!=='' ? String(q.maxMarks) : '\u2014';
+      const marksVal = q.marks!==''    ? String(q.marks)    : '\u2014';
+      // Q label
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...BLK);
+      doc.text(q.label, x0, ry);
+      // Max marks
+      doc.text(maxVal, x0+Q_COL+MX_COL, ry, {align:'right'});
+      // Marks obtained — green if filled, black dash if not
+      if(q.marks!==''){
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(...GRN);
+      } else {
+        doc.setFont('helvetica','normal');
+        doc.setTextColor(...GRY);
+      }
+      doc.text(marksVal, x0+Q_COL+MX_COL+MK_COL+6, ry, {align:'right'});
+      ry += ROW_H;
+    });
+  }
+
+  // Vertical separators between columns
+  doc.setDrawColor(200,200,200);
+  doc.setLineWidth(0.4);
+  for(let c=1;c<NUM_COLS;c++){
+    const lx = M + c*COL_W - 4;
+    doc.line(lx, rowStartY-8, lx, rowStartY + Math.min(PER_COL, Math.ceil(total/NUM_COLS))*ROW_H);
+  }
+
+  // Handle overflow: if more than NUM_COLS*10 questions, add a note
+  const shownQ = NUM_COLS * PER_COL;
+  if(total > shownQ){
+    y = rowStartY + PER_COL * ROW_H + 4;
+    doc.setFont('helvetica','italic');
+    doc.setFontSize(8);
+    doc.setTextColor(...GRY);
+    doc.text(`+ ${total - shownQ} more question(s) — see full list in answer sheet`, M, y);
+    y += 12;
+  } else {
+    y = rowStartY + Math.ceil(total/NUM_COLS) * ROW_H + 4;
+  }
+
+  // ─── BOTTOM RULE ──────────────────────────────────────────
+  doc.setDrawColor(...BLK);
+  doc.setLineWidth(0.7);
+  doc.line(M, y, PW-M, y);
+  y += 16;
+
+  // ─── TOTALS + REMARKS ─────────────────────────────────────
+  const fmtN = v => v%1===0 ? String(v) : v.toFixed(1);
+  const halfX = PW/2;
+
+  // Left: Marks Obtained
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(...BLK);
+  doc.text('Marks Obtained:', M, y);
+  doc.setFont('helvetica','bold');
+  doc.setTextColor(...GRN);
+  doc.text(fmtN(totalMarks), M+98, y);
+
+  y += 17;
+
+  // Left: Maximum Marks
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(...BLK);
+  doc.text('Maximum Marks:', M, y);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(...BLK);
+  doc.text(fmtN(totalMax), M+98, y);
+
+  // Right: Remarks (aligned right half, same vertical start as Marks Obtained)
+  if(remarks && remarks.trim()){
+    const ry0 = y - 17;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...BLK);
+    doc.text('Remarks:', halfX+10, ry0);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...BLK);
+    const lines = doc.splitTextToSize(remarks.trim(), PW - halfX - M - 10);
+    doc.text(lines, halfX+10, ry0+13);
+  }
+
+  // ─── FOOTER ───────────────────────────────────────────────
+  doc.setFont('helvetica','italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(160,160,160);
+  doc.text('Generated by OSM \u2022 On-Screen Marking System', PW/2, PH-20, {align:'center'});
+}
+
+function drawAnnOnCanvas(ctx,ann,s){
+  const cx=ann.x*s, cy=ann.y*s;
+
+  if(ann.type==='tick'){
+    const sz=ANN.TICK_SIZE*s;
+    const sw=ANN.STROKE*s;
+    const r=ANN.CIRCLE_R*s;
+    // Checkmark
+    ctx.strokeStyle='#00c896'; ctx.lineWidth=sw;
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath();
+    ctx.moveTo(cx-sz*0.55, cy+sz*0.05);
+    ctx.lineTo(cx-sz*0.05, cy+sz*0.6);
+    ctx.lineTo(cx+sz*0.75, cy-sz*0.65);
+    ctx.stroke();
+    // Circle clearly to the right, no overlap
+    const ox=cx+sz*0.75+12*s+r, oy=cy;
+    ctx.beginPath(); ctx.arc(ox,oy,r,0,Math.PI*2);
+    ctx.fillStyle='#00c896'; ctx.fill();
+    ctx.strokeStyle='#006e50'; ctx.lineWidth=sw*0.5; ctx.stroke();
+    // White text
+    ctx.fillStyle='#ffffff';
+    ctx.font=`800 ${ANN.CIRCLE_FONT*s}px monospace`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(ann.mark),ox,oy);
+
+  }else if(ann.type==='cross'){
+    const r=ANN.CROSS_R*s, arm=ANN.CROSS_ARM*s, sw=ANN.STROKE*s;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,71,87,0.1)'; ctx.fill();
+    ctx.strokeStyle='#ff4757'; ctx.lineWidth=sw*0.7; ctx.stroke();
+    ctx.strokeStyle='#ff4757'; ctx.lineWidth=sw; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(cx-arm,cy-arm); ctx.lineTo(cx+arm,cy+arm); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+arm,cy-arm); ctx.lineTo(cx-arm,cy+arm); ctx.stroke();
+    ctx.fillStyle='#ff4757';
+    ctx.font=`800 ${ANN.CIRCLE_FONT*s}px monospace`;
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText('0',cx+r+8*s,cy-r+4*s);
+
+  }else if(ann.type==='blank'||ann.type==='rough'){
+    const color=ann.type==='blank'?'#ff4757':'#ff6b35';
+    const label=ann.type==='blank'?'BLANK PAGE':'ROUGH WORK';
+    const bw=ANN.STAMP_W*s, bh=ANN.STAMP_H*s;
+    const bx=cx-bw/2, by=cy-bh/2;
+    const corner=8*s, sw=ANN.STROKE*s;
+
+    ctx.strokeStyle=color; ctx.lineWidth=sw*0.5; ctx.globalAlpha=0.45;
+    canvasRRect(ctx,bx-5*s,by-5*s,bw+10*s,bh+10*s,corner+4*s); ctx.stroke();
+    ctx.globalAlpha=1;
+
+    ctx.fillStyle=color+'22'; canvasRRect(ctx,bx,by,bw,bh,corner); ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=sw; canvasRRect(ctx,bx,by,bw,bh,corner); ctx.stroke();
+
+    ctx.fillStyle=color;
+    ctx.font=`800 ${ANN.STAMP_FONT*s}px sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(label,cx,cy);
+  }
+}
+
+function canvasRRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+
+// ─── KEYBOARD SHORTCUTS ───────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(!state.pdfDoc) return;
+  switch(e.key){
+    case '+': case '=': doZoom(+0.1); break;
+    case '-': doZoom(-0.1); break;
+    case 't': selectTool('tick'); break;
+    case 'x': selectTool('cross'); break;
+    case 'b': selectTool('blank'); break;
+    case 'r': selectTool('rough'); break;
+    case 'd': selectTool('delete'); break;
+    case 'Escape': hideDropdown(); break;
+  }
+});
+
+// ─── UTILS ────────────────────────────────────────────────
+function showToast(msg,dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>t.classList.remove('show'),dur);
+}
+function setProgress(p){ document.getElementById('progress-bar').style.width=p+'%'; }
+
+// ─── INIT ─────────────────────────────────────────────────
+initQuestions(25);
+showToast('👋 Welcome to OSM — Load a PDF to begin.');
+</script>
+</body>
+</html>
