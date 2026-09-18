@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSM — On-Screen Marking System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --osm-dark:#1a3a5c;    /* CBSE dark navy header */
+  --osm-mid:#2563a8;     /* medium blue sidebar */
+  --osm-light:#4a90d9;   /* lighter blue accent */
+  --osm-sky:#b8d4f0;     /* very light blue for hover */
+  --osm-green:#2e7d32;   /* green for positive actions */
+  --osm-green-l:#4caf50;
+  --osm-red:#c62828;
+  --osm-red-l:#ef5350;
+  --osm-amber:#f57c00;
+  --osm-teal:#00796b;
+  --osm-teal-l:#26a69a;
+  --white:#ffffff;
+  --off-white:#f4f6f9;
+  --border:#d0d7e2;
+  --text-dark:#1a1a2e;
+  --text-mid:#4a5568;
+  --text-light:#6b7280;
+  --tick-green:#00a86b;
+  --mark-orange:#e65100;
+}
+
+body{
+  font-family:'Roboto',sans-serif;
+  background:var(--off-white);
+  color:var(--text-dark);
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  font-size:13px;
+}
+
+/* ═══════════════════════════════════════
+   LANDING PAGE
+═══════════════════════════════════════ */
+#landing{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  overflow:hidden;
+}
+
+/* Top header bar — dark navy like CBSE OSM */
+#landing-header{
+  background:var(--osm-dark);
+  height:68px;
+  display:flex;
+  align-items:center;
+  padding:0 24px;
+  gap:16px;
+  flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+}
+#landing-header .logo-circle{
+  width:48px;height:48px;
+  border-radius:50%;
+  background:var(--white);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+#landing-header .sys-title{
+  color:var(--white);
+  font-size:17px;font-weight:500;
+  letter-spacing:0.2px;
+}
+#landing-header .sys-subtitle{
+  color:var(--osm-sky);
+  font-size:11px;margin-top:2px;
+  letter-spacing:0.3px;
+}
+#landing-header .header-right{
+  margin-left:auto;
+  color:var(--osm-sky);
+  font-size:12px;
+  text-align:right;
+}
+
+/* Sidebar + Content layout */
+#landing-body{
+  display:flex;
+  flex:1;
+  overflow:hidden;
+}
+
+/* Left sidebar — hidden */
+#sidebar{
+  display:none;
+}
+#sidebar-title{
+  padding:14px 16px 10px;
+  color:var(--white);
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  border-bottom:1px solid rgba(255,255,255,0.12);
+}
+.sidebar-item{
+  padding:11px 18px;
+  color:rgba(255,255,255,0.85);
+  font-size:13px;
+  cursor:pointer;
+  border-left:3px solid transparent;
+  transition:all 0.15s;
+  display:flex;align-items:center;gap:8px;
+}
+.sidebar-item:hover{
+  background:rgba(255,255,255,0.1);
+  color:var(--white);
+  border-left-color:rgba(255,255,255,0.4);
+}
+.sidebar-item.active{
+  background:rgba(255,255,255,0.15);
+  color:var(--white);
+  border-left-color:var(--white);
+  font-weight:500;
+}
+.sidebar-item .si-icon{font-size:15px;flex-shrink:0;}
+
+/* Main content area */
+#landing-main{
+  flex:1;
+  overflow-y:auto;
+  padding:28px 32px;
+  background:var(--off-white);
+}
+
+/* Welcome banner */
+.welcome-banner{
+  background:linear-gradient(135deg,var(--osm-dark),var(--osm-mid));
+  border-radius:10px;
+  padding:28px 32px;
+  color:var(--white);
+  margin-bottom:28px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  box-shadow:0 4px 16px rgba(26,58,92,0.25);
+}
+.welcome-banner h1{font-size:22px;font-weight:700;margin-bottom:6px;}
+.welcome-banner p{font-size:13px;color:rgba(255,255,255,0.8);}
+
+.btn-new-eval{
+  background:var(--osm-green);
+  color:var(--white);
+  border:none;
+  padding:12px 24px;
+  border-radius:6px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  white-space:nowrap;
+  transition:all 0.15s;
+  box-shadow:0 2px 8px rgba(0,0,0,0.2);
+  font-family:'Roboto',sans-serif;
+}
+.btn-new-eval:hover{background:#1b5e20;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.25);}
+
+/* Stats row */
+.stats-row{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:16px;
+  margin-bottom:28px;
+}
+.stat-card{
+  background:var(--white);
+  border-radius:8px;
+  padding:18px 20px;
+  border:1px solid var(--border);
+  box-shadow:0 1px 4px rgba(0,0,0,0.05);
+}
+.stat-card .sc-val{font-size:28px;font-weight:700;color:var(--osm-mid);font-family:'JetBrains Mono',monospace;}
+.stat-card .sc-label{font-size:11px;color:var(--text-light);margin-top:4px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;}
+
+/* Evaluations table */
+.section-card{
+  background:var(--white);
+  border-radius:8px;
+  border:1px solid var(--border);
+  box-shadow:0 1px 4px rgba(0,0,0,0.05);
+  overflow:hidden;
+}
+.section-card-header{
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--white);
+}
+.section-card-header h2{
+  font-size:15px;font-weight:600;color:var(--osm-dark);
+}
+
+table.osm-table{width:100%;border-collapse:collapse;}
+.osm-table thead tr{background:#eef3fb;}
+.osm-table th{
+  padding:10px 14px;
+  font-size:11px;font-weight:700;
+  color:var(--text-mid);
+  text-align:left;
+  text-transform:uppercase;letter-spacing:0.5px;
+  border-bottom:1px solid var(--border);
+}
+.osm-table td{
+  padding:10px 14px;
+  font-size:13px;
+  border-bottom:1px solid #f0f2f5;
+  color:var(--text-dark);
+}
+.osm-table tbody tr:hover{background:#f7f9fc;}
+.osm-table td.num{font-family:'JetBrains Mono',monospace;font-size:12px;}
+
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 9px;border-radius:12px;
+  font-size:11px;font-weight:600;
+}
+.badge-green{background:#e8f5e9;color:#2e7d32;}
+.badge-blue{background:#e3f2fd;color:#1565c0;}
+.badge-amber{background:#fff3e0;color:#e65100;}
+.badge-red{background:#ffebee;color:#c62828;}
+
+.tbl-action-btn{
+  background:var(--osm-mid);color:var(--white);
+  border:none;padding:5px 12px;border-radius:4px;
+  font-size:11px;font-weight:600;cursor:pointer;
+  transition:background 0.15s;font-family:'Roboto',sans-serif;
+}
+.tbl-action-btn:hover{background:var(--osm-dark);}
+.tbl-action-btn.resume{background:var(--osm-green);}
+.tbl-action-btn.resume:hover{background:#1b5e20;}
+
+/* ═══════════════════════════════════════
+   NEW EVALUATION MODAL
+═══════════════════════════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(10,20,40,0.65);
+  backdrop-filter:blur(3px);
+  z-index:500;
+  display:none;align-items:center;justify-content:center;
+}
+.modal-overlay.show{display:flex;}
+
+.modal-box{
+  background:var(--white);
+  border-radius:10px;
+  box-shadow:0 12px 48px rgba(0,0,0,0.35);
+  width:820px;
+  max-width:96vw;
+  max-height:90vh;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.modal-header{
+  background:var(--osm-dark);
+  padding:16px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.modal-header h2{color:var(--white);font-size:16px;font-weight:600;}
+.modal-header .modal-close{
+  background:rgba(255,255,255,0.15);border:none;
+  color:var(--white);width:28px;height:28px;border-radius:50%;
+  cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;
+  transition:background 0.15s;
+}
+.modal-header .modal-close:hover{background:rgba(255,255,255,0.3);}
+
+.modal-body{
+  padding:24px;overflow-y:auto;flex:1;
+}
+.modal-footer{
+  padding:14px 24px;
+  border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:10px;
+  flex-shrink:0;background:var(--off-white);
+}
+
+/* Form fields */
+.form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group label{
+  font-size:11px;font-weight:700;color:var(--text-mid);
+  text-transform:uppercase;letter-spacing:0.6px;
+}
+.form-group input{
+  border:1.5px solid var(--border);border-radius:5px;
+  padding:9px 12px;font-family:'Roboto',sans-serif;font-size:13px;
+  color:var(--text-dark);outline:none;transition:border-color 0.15s;
+}
+.form-group input:focus{border-color:var(--osm-light);}
+
+/* Upload zone strip */
+.uploads-strip{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:14px;
+  margin-top:6px;
+}
+.upload-zone{
+  border:2px dashed var(--border);
+  border-radius:8px;
+  padding:20px 14px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s;
+  background:#fafbfc;
+  position:relative;
+  min-height:140px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;
+}
+.upload-zone:hover{border-color:var(--osm-light);background:#f0f6ff;}
+.upload-zone.has-file{border-color:var(--osm-green);border-style:solid;background:#f1f8f1;}
+.upload-zone.drag-over{border-color:var(--osm-light);background:#e8f1fc;transform:scale(1.02);}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.uz-icon{font-size:30px;line-height:1;}
+.uz-title{font-size:12px;font-weight:700;color:var(--osm-dark);}
+.uz-sub{font-size:10px;color:var(--text-light);}
+.uz-filename{font-size:11px;color:var(--osm-green);font-weight:600;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.uz-clear{
+  position:absolute;top:8px;right:8px;
+  background:var(--osm-red-l);color:white;border:none;
+  border-radius:50%;width:20px;height:20px;
+  font-size:12px;cursor:pointer;display:none;
+  align-items:center;justify-content:center;
+  font-family:'Roboto',sans-serif;
+}
+.upload-zone.has-file .uz-clear{display:flex;}
+
+.modal-section-label{
+  font-size:11px;font-weight:700;color:var(--text-mid);
+  text-transform:uppercase;letter-spacing:0.6px;
+  margin-bottom:10px;
+  padding-bottom:6px;
+  border-bottom:1px solid var(--border);
+}
+
+/* Buttons */
+.btn{
+  border:none;padding:9px 20px;border-radius:5px;
+  font-family:'Roboto',sans-serif;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;
+}
+.btn-primary{background:var(--osm-green);color:var(--white);}
+.btn-primary:hover{background:#1b5e20;}
+.btn-primary:disabled{background:#aaa;cursor:not-allowed;}
+.btn-secondary{background:var(--off-white);color:var(--text-mid);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--border);}
+
+/* ═══════════════════════════════════════
+   EVALUATION VIEW
+═══════════════════════════════════════ */
+#eval-view{
+  display:none;
+  flex-direction:column;
+  height:100vh;
+  overflow:hidden;
+}
+
+/* Thin top bar — dark green like OSM */
+#eval-topbar{
+  height:28px;
+  background:var(--osm-dark);
+  display:flex;align-items:center;padding:0 12px;
+  font-size:11px;color:rgba(255,255,255,0.9);
+  flex-shrink:0;gap:16px;font-weight:500;letter-spacing:0.2px;
+}
+#eval-topbar .etb-subject{font-weight:700;color:var(--white);}
+#eval-topbar .etb-right{margin-left:auto;display:flex;gap:14px;align-items:center;}
+
+/* Main eval area */
+#eval-main{
+  display:flex;
+  flex:1;
+  overflow:hidden;
+}
+
+/* Left Q-panel — matches OSM screenshot exactly */
+#q-panel{
+  width:236px;
+  background:var(--white);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  flex-shrink:0;
+  overflow:hidden;
+}
+#q-panel-top{
+  background:var(--osm-dark);
+  padding:10px 12px;
+  display:flex;align-items:center;gap:10px;
+}
+#q-panel-top .logo-sm{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
+#q-panel-top .info-block{color:var(--white);}
+#q-panel-top .info-block .info-row{font-size:10px;color:rgba(255,255,255,0.8);margin-bottom:1px;}
+#q-panel-top .info-block .info-val{font-weight:600;}
+
+/* Q table */
+.q-scroll{flex:1;overflow-y:auto;}
+.q-scroll::-webkit-scrollbar{width:4px;}
+.q-scroll::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px;}
+
+table.q-table{width:100%;border-collapse:collapse;}
+.q-table thead th{
+  background:#eef3fb;
+  font-size:9.5px;font-weight:700;color:var(--text-mid);
+  text-transform:uppercase;letter-spacing:0.4px;
+  padding:6px 4px;text-align:center;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:1;
+}
+.q-table tbody tr{border-bottom:1px solid #f0f2f5;}
+.q-table tbody tr:hover{background:#f7f9fc;}
+.q-table tbody tr.q-active{background:#e8f5e9;}
+.q-table td{
+  padding:5px 4px;text-align:center;
+  font-size:11px;vertical-align:middle;
+}
+.q-num-cell{font-weight:700;color:var(--osm-dark);font-size:11px;}
+.q-input-cell input{
+  width:42px;border:1px solid var(--border);border-radius:3px;
+  padding:3px 2px;text-align:center;font-size:11px;
+  font-family:'JetBrains Mono',monospace;color:var(--text-dark);
+  outline:none;background:var(--white);
+}
+.q-input-cell input:focus{border-color:var(--osm-light);}
+.q-input-cell input.filled{background:#e8f5e9;border-color:var(--osm-green);color:var(--osm-green);font-weight:700;}
+
+/* Steps cell — coloured pill like OSM */
+.steps-cell{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;font-weight:600;
+  padding:2px 5px;border-radius:3px;
+}
+.steps-cell.green{background:#e8f5e9;color:#1b5e20;}
+.steps-cell.amber{background:#fff3e0;color:#e65100;}
+.steps-cell.red{background:#ffebee;color:#c62828;}
+.steps-cell.none{color:#aaa;}
+
+/* Q panel footer */
+#q-panel-footer{
+  border-top:1px solid var(--border);
+  padding:10px 12px;
+  background:#fafbfc;
+}
+.total-bar{
+  background:var(--osm-dark);
+  color:var(--white);
+  padding:6px 12px;
+  border-radius:5px;
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;
+}
+.total-bar .tl-val{
+  font-family:'JetBrains Mono',monospace;
+  font-size:14px;font-weight:700;color:#a5d6a7;
+}
+.add-q-strip{
+  display:flex;gap:6px;margin-top:8px;
+}
+.add-q-btn{
+  flex:1;background:#eef3fb;border:1px solid var(--border);
+  color:var(--osm-mid);padding:6px;border-radius:4px;
+  font-size:11px;font-weight:600;cursor:pointer;text-align:center;
+  transition:all 0.12s;font-family:'Roboto',sans-serif;
+}
+.add-q-btn:hover{background:var(--osm-sky);}
+
+/* Center viewer */
+#viewer-area{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:#2d2d2d;
+}
+
+#pdf-scroll{
+  flex:1;
+  overflow:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:16px;
+  gap:14px;
+}
+#pdf-scroll::-webkit-scrollbar{width:10px;height:10px;}
+#pdf-scroll::-webkit-scrollbar-track{background:#1a1a1a;}
+#pdf-scroll::-webkit-scrollbar-thumb{background:#555;border-radius:5px;}
+#pdf-scroll::-webkit-scrollbar-thumb:hover{background:#777;}
+
+.page-wrapper{
+  position:relative;flex-shrink:0;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6);
+  cursor:crosshair;background:#fff;
+}
+.page-canvas{display:block;}
+.ann-svg{
+  position:absolute;top:0;left:0;
+  width:100%;height:100%;
+  pointer-events:none;overflow:visible;
+}
+.annotation-group{pointer-events:all;}
+.annotation-group:hover .ann-delete{opacity:1;}
+.ann-delete{cursor:pointer;opacity:0;transition:opacity 0.15s;}
+
+/* Bottom bar — exactly matches OSM screenshot */
+#eval-bottom{
+  height:56px;
+  background:var(--osm-dark);
+  flex-shrink:0;
+  display:flex;align-items:center;
+  padding:0 10px;
+  gap:6px;
+}
+
+/* Page number pills */
+#page-nav-strip{
+  display:flex;gap:3px;overflow-x:auto;flex:1;padding:2px 0;
+}
+#page-nav-strip::-webkit-scrollbar{height:3px;}
+#page-nav-strip::-webkit-scrollbar-thumb{background:#555;}
+
+.pg-pill{
+  min-width:28px;height:24px;
+  border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;
+  cursor:pointer;flex-shrink:0;
+  border:1px solid transparent;
+  transition:all 0.12s;
+  font-family:'JetBrains Mono',monospace;
+}
+.pg-pill.unvisited{background:#8b0000;color:rgba(255,255,255,0.9);}
+.pg-pill.visited{background:#1b5e20;color:rgba(255,255,255,0.9);}
+.pg-pill.current{background:var(--white);color:var(--osm-dark);border-color:var(--white);}
+.pg-pill:hover{transform:scale(1.1);}
+
+/* Bottom info */
+.btm-info{
+  color:rgba(255,255,255,0.8);
+  font-size:10px;white-space:nowrap;
+  padding:0 8px;border-left:1px solid rgba(255,255,255,0.2);
+  line-height:1.5;
+}
+.btm-info .btm-label{color:rgba(255,255,255,0.55);font-size:9px;}
+
+/* Zoom controls */
+.zoom-row{display:flex;gap:4px;align-items:center;border-left:1px solid rgba(255,255,255,0.2);padding-left:8px;}
+.zm-btn{
+  width:26px;height:26px;background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.2);color:var(--white);
+  border-radius:3px;cursor:pointer;font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.12s;
+}
+.zm-btn:hover{background:rgba(255,255,255,0.25);}
+.zm-disp{color:rgba(255,255,255,0.7);font-size:10px;min-width:36px;text-align:center;
+  font-family:'JetBrains Mono',monospace;}
+
+/* Mark-size (annotation scale) slider */
+.marksize-row{
+  display:flex;gap:6px;align-items:center;
+  border-left:1px solid rgba(255,255,255,0.2);padding-left:8px;
+}
+.marksize-row .ms-icon{font-size:11px;color:rgba(255,255,255,0.7);}
+.marksize-row input[type="range"]{
+  width:70px;accent-color:var(--osm-green-l);
+  cursor:pointer;height:14px;
+}
+.ms-disp{color:rgba(255,255,255,0.7);font-size:10px;min-width:34px;text-align:center;
+  font-family:'JetBrains Mono',monospace;}
+
+/* Tool buttons — OSM style icon buttons */
+.tool-strip{
+  display:flex;gap:4px;align-items:center;
+  border-left:1px solid rgba(255,255,255,0.2);padding-left:8px;
+}
+.tool-btn{
+  height:34px;padding:0 10px;
+  border:1.5px solid rgba(255,255,255,0.25);
+  border-radius:4px;
+  color:var(--white);
+  background:rgba(255,255,255,0.08);
+  cursor:pointer;
+  font-size:11px;font-weight:600;
+  display:flex;align-items:center;gap:5px;
+  transition:all 0.12s;font-family:'Roboto',sans-serif;
+  white-space:nowrap;
+}
+.tool-btn:hover{background:rgba(255,255,255,0.2);}
+.tool-btn.t-tick.active{background:#1b5e20;border-color:#4caf50;color:#a5d6a7;}
+.tool-btn.t-cross.active{background:#7f0000;border-color:#ef5350;color:#ffcdd2;}
+.tool-btn.t-blank.active{background:#4a148c;border-color:#ce93d8;color:#f3e5f5;}
+.tool-btn.t-rough.active{background:#bf360c;border-color:#ffb74d;color:#fff3e0;}
+.tool-btn.t-delete.active{background:#880e4f;border-color:#f48fb1;color:#fce4ec;}
+.tool-icon{font-size:14px;}
+
+/* Extra action buttons right of toolbar */
+.action-strip{
+  display:flex;gap:4px;
+  border-left:1px solid rgba(255,255,255,0.2);
+  padding-left:8px;
+}
+.act-btn{
+  height:34px;padding:0 10px;
+  border:1.5px solid rgba(255,255,255,0.2);
+  border-radius:4px;
+  color:var(--white);background:rgba(255,255,255,0.08);
+  cursor:pointer;font-size:11px;font-weight:600;
+  display:flex;align-items:center;gap:4px;
+  transition:all 0.12s;font-family:'Roboto',sans-serif;
+  white-space:nowrap;
+}
+.act-btn:hover{background:rgba(255,255,255,0.2);}
+.act-btn.green{background:var(--osm-green);border-color:#4caf50;}
+.act-btn.green:hover{background:#1b5e20;}
+.act-btn.red-btn{background:var(--osm-red);border-color:#ef5350;}
+.act-btn.red-btn:hover{background:#7f0000;}
+
+/* Right panel (Q.P. / Sol. viewer) */
+#right-panel{
+  width:0;
+  background:var(--white);
+  border-left:1px solid var(--border);
+  flex-shrink:0;
+  overflow:hidden;
+  transition:width 0.25s;
+  display:flex;flex-direction:column;
+}
+#right-panel.open{width:380px;}
+#rp-header{
+  background:var(--osm-dark);padding:8px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+#rp-header span{color:var(--white);font-size:12px;font-weight:600;}
+#rp-tabs{display:flex;gap:2px;}
+.rp-tab{
+  padding:4px 10px;border-radius:3px;font-size:11px;font-weight:600;
+  cursor:pointer;color:rgba(255,255,255,0.7);border:1px solid transparent;
+  transition:all 0.12s;font-family:'Roboto',sans-serif;
+}
+.rp-tab.active{background:var(--white);color:var(--osm-dark);}
+.rp-tab:not(.active):hover{background:rgba(255,255,255,0.15);}
+#rp-close{background:transparent;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:16px;padding:2px 4px;}
+#rp-close:hover{color:var(--white);}
+#rp-content{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:12px;gap:10px;background:#444;}
+#rp-content canvas{display:block;box-shadow:0 2px 8px rgba(0,0,0,0.4);width:100%;height:auto;}
+
+/* Mark dropdown */
+#mark-dropdown{
+  position:fixed;
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:6px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.2);
+  z-index:1000;min-width:120px;
+  overflow:hidden;display:none;
+}
+#mark-dropdown .dd-header{
+  background:var(--osm-dark);padding:7px 12px;
+  font-size:10px;font-weight:700;color:var(--white);
+  letter-spacing:0.5px;text-transform:uppercase;
+}
+.dd-item{
+  padding:8px 14px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;
+  font-size:13px;font-weight:600;
+  color:var(--text-dark);
+  display:flex;align-items:center;gap:8px;
+  transition:background 0.1s;border-bottom:1px solid #f5f5f5;
+}
+.dd-item:hover{background:#e8f5e9;color:var(--osm-green);}
+.dd-item:last-child{border-bottom:none;}
+.dd-dot{width:8px;height:8px;border-radius:50%;background:var(--tick-green);flex-shrink:0;}
+
+/* Remarks modal */
+#remarks-modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:600;display:none;align-items:center;justify-content:center;}
+#remarks-modal.show{display:flex;}
+#remarks-modal .modal-box{width:480px;}
+.form-group textarea{
+  border:1.5px solid var(--border);border-radius:5px;
+  padding:9px 12px;font-family:'Roboto',sans-serif;font-size:13px;
+  color:var(--text-dark);outline:none;transition:border-color 0.15s;
+  resize:vertical;min-height:90px;width:100%;
+}
+.form-group textarea:focus{border-color:var(--osm-light);}
+.form-group-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:70px;left:50%;
+  transform:translateX(-50%) translateY(16px);
+  background:rgba(20,20,40,0.92);
+  color:var(--white);padding:9px 20px;
+  border-radius:20px;font-size:12px;font-weight:500;
+  z-index:2000;opacity:0;transition:all 0.25s;
+  pointer-events:none;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+#progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--osm-green);width:0%;z-index:9999;transition:width 0.3s;}
+
+/* Cursor per tool */
+body[data-tool="tick"]   .page-wrapper{cursor:copy;}
+body[data-tool="cross"]  .page-wrapper{cursor:crosshair;}
+body[data-tool="blank"]  .page-wrapper{cursor:cell;}
+body[data-tool="rough"]  .page-wrapper{cursor:cell;}
+body[data-tool="delete"] .page-wrapper{cursor:not-allowed;}
+
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);
+  border-top-color:var(--white);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px;}
+</style>
+</head>
+<body data-tool="tick">
+<div id="progress-bar"></div>
+
+<!-- ═══════════════════════════════════════
+     LANDING PAGE
+═══════════════════════════════════════ -->
+<div id="landing">
+  <div id="landing-header">
+    <div class="logo-circle">🎓</div>
+    <div>
+      <div class="sys-title">On-Screen Marking System (OSM)</div>
+      <div class="sys-subtitle">Digital Evaluation Platform</div>
+    </div>
+    <div class="header-right">
+      <div style="font-size:13px;font-weight:600;color:var(--white)">Evaluator</div>
+      <div>Session: <span id="session-date"></span></div>
+    </div>
+  </div>
+
+  <div id="landing-body">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div id="sidebar-title">Main Menu</div>
+      <div class="sidebar-item active" onclick="showSection('home')"><span class="si-icon">🏠</span> Home</div>
+      <div class="sidebar-item" onclick="showSection('assessment')"><span class="si-icon">✅</span> Main Assessment</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">👤</span> Profile</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">📊</span> Subject wise Eval. Report</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">📅</span> Day wise Evaluation Report</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">📋</span> Script wise Report</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">🔍</span> AHE Reviewed Report</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">📈</span> Eval. Marks Report</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">ℹ️</span> AHE Details</div>
+      <div class="sidebar-item" onclick="showSection('home')"><span class="si-icon">🆘</span> Help Desk</div>
+    </div>
+
+    <!-- Main content -->
+    <div id="landing-main">
+      <!-- Welcome banner -->
+      <div class="welcome-banner">
+        <div>
+          <h1>Welcome to OSM</h1>
+          <p>On-Screen Marking — Digital evaluation platform for answer scripts</p>
+        </div>
+        <button class="btn-new-eval" onclick="openNewEvalModal()">
+          <span>＋</span> Start New Evaluation
+        </button>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="sc-val" id="stat-total">0</div>
+          <div class="sc-label">Total Scripts</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-val" id="stat-completed" style="color:var(--osm-green)">0</div>
+          <div class="sc-label">Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-val" id="stat-pending" style="color:var(--osm-amber)">0</div>
+          <div class="sc-label">In Progress</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-val" id="stat-rejected" style="color:var(--osm-red)">0</div>
+          <div class="sc-label">Rejected</div>
+        </div>
+      </div>
+
+      <!-- Evaluations table -->
+      <div class="section-card">
+        <div class="section-card-header">
+          <h2>Evaluation Scripts</h2>
+          <button class="btn-new-eval" style="font-size:12px;padding:8px 16px;" onclick="openNewEvalModal()">＋ New Evaluation</button>
+        </div>
+        <table class="osm-table">
+          <thead>
+            <tr>
+              <th>Sl.No.</th>
+              <th>Paper Code</th>
+              <th>Subject / Paper Name</th>
+              <th>Date Started</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="eval-list-tbody">
+            <tr>
+              <td colspan="6" style="text-align:center;padding:32px;color:var(--text-light);">
+                No evaluations yet. Click <strong>Start New Evaluation</strong> to begin.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     NEW EVALUATION MODAL
+═══════════════════════════════════════ -->
+<div class="modal-overlay" id="new-eval-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>📋 Start New Evaluation</h2>
+      <button class="modal-close" onclick="closeNewEvalModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- Paper details -->
+      <div class="form-row-2" style="margin-bottom:20px;">
+        <div class="form-group">
+          <label>Exam / Paper Name</label>
+          <input type="text" id="ne-exam-name" placeholder="e.g. ECONOMICS-Set-2">
+        </div>
+        <div class="form-group">
+          <label>Paper Code</label>
+          <input type="text" id="ne-paper-code" placeholder="e.g. 0302">
+        </div>
+      </div>
+      <div class="form-row-2" style="margin-bottom:20px;">
+        <div class="form-group">
+          <label>Subject</label>
+          <input type="text" id="ne-subject" placeholder="e.g. Chemistry">
+        </div>
+        <div class="form-group">
+          <label>Set Number</label>
+          <input type="text" id="ne-set" placeholder="e.g. Set-1">
+        </div>
+      </div>
+
+      <!-- Upload strip -->
+      <div class="modal-section-label">Upload Documents</div>
+      <div class="uploads-strip">
+        <!-- Answer Sheet -->
+        <div class="upload-zone" id="uz-answer" ondragover="uzDrag(event,'uz-answer')" ondragleave="uzLeave('uz-answer')" ondrop="uzDrop(event,'uz-answer','answer-file')">
+          <input type="file" accept=".pdf" id="answer-file" onchange="uzSelect('uz-answer','answer-file')">
+          <div class="uz-icon">📄</div>
+          <div class="uz-title">Answer Sheet</div>
+          <div class="uz-sub">Scanned PDF</div>
+          <div class="uz-filename" id="uz-answer-name">No file selected</div>
+          <button class="uz-clear" onclick="uzClear(event,'uz-answer','answer-file')">×</button>
+        </div>
+        <!-- Question Paper -->
+        <div class="upload-zone" id="uz-qp" ondragover="uzDrag(event,'uz-qp')" ondragleave="uzLeave('uz-qp')" ondrop="uzDrop(event,'uz-qp','qp-file')">
+          <input type="file" accept=".pdf" id="qp-file" onchange="uzSelect('uz-qp','qp-file')">
+          <div class="uz-icon">📝</div>
+          <div class="uz-title">Question Paper</div>
+          <div class="uz-sub">PDF</div>
+          <div class="uz-filename" id="uz-qp-name">No file selected</div>
+          <button class="uz-clear" onclick="uzClear(event,'uz-qp','qp-file')">×</button>
+        </div>
+        <!-- Marking Scheme -->
+        <div class="upload-zone" id="uz-ms" ondragover="uzDrag(event,'uz-ms')" ondragleave="uzLeave('uz-ms')" ondrop="uzDrop(event,'uz-ms','ms-file')">
+          <input type="file" accept=".pdf" id="ms-file" onchange="uzSelect('uz-ms','ms-file')">
+          <div class="uz-icon">🗒️</div>
+          <div class="uz-title">Marking Scheme</div>
+          <div class="uz-sub">PDF</div>
+          <div class="uz-filename" id="uz-ms-name">No file selected</div>
+          <button class="uz-clear" onclick="uzClear(event,'uz-ms','ms-file')">×</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeNewEvalModal()">Cancel</button>
+      <button class="btn btn-primary" id="start-eval-btn" onclick="startEvaluation()">
+        Start Evaluation →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     EVALUATION VIEW
+═══════════════════════════════════════ -->
+<div id="eval-view">
+  <!-- Top bar -->
+  <div id="eval-topbar">
+    <span>OSM</span>
+    <span style="color:rgba(255,255,255,0.4)">|</span>
+    <span class="etb-subject" id="etb-subject">—</span>
+    <div class="etb-right">
+      <span id="etb-scriptid" style="color:rgba(255,255,255,0.7);">Script ID: —</span>
+      <span id="etb-time" style="color:rgba(255,255,255,0.6);font-family:'JetBrains Mono',monospace;">00:00:00</span>
+      <button onclick="backToLanding()" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:var(--white);padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;font-family:'Roboto',sans-serif;">← Back</button>
+    </div>
+  </div>
+
+  <div id="eval-main">
+    <!-- Left Q panel -->
+    <div id="q-panel">
+      <div id="q-panel-top">
+        <div class="logo-sm">🎓</div>
+        <div class="info-block">
+          <div class="info-row">Script ID: <span class="info-val" id="qp-scriptid">—</span></div>
+          <div class="info-row">User Role: <span class="info-val">Evaluator</span></div>
+        </div>
+      </div>
+
+      <div class="q-scroll">
+        <table class="q-table">
+          <thead>
+            <tr>
+              <th>Q.No.</th>
+              <th>Max.<br>Marks</th>
+              <th>Marks</th>
+              <th>Steps</th>
+            </tr>
+          </thead>
+          <tbody id="q-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="q-panel-footer">
+        <div class="total-bar">
+          <span style="font-size:11px;font-weight:600;">Total</span>
+          <span class="tl-val" id="total-disp">0 / 0</span>
+        </div>
+        <div class="add-q-strip">
+          <button class="add-q-btn" onclick="addQuestion()">+ Add Q</button>
+          <button class="add-q-btn" style="background:#fff0f0;border-color:#fcc;color:var(--osm-red);" onclick="removeLastQuestion()">− Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center viewer -->
+    <div id="viewer-area">
+      <div id="pdf-scroll">
+        <div id="empty-state" style="color:rgba(255,255,255,0.4);text-align:center;padding:60px;pointer-events:none;">
+          <div style="font-size:48px;margin-bottom:12px;">📄</div>
+          <div style="font-size:16px;font-weight:500;">No answer sheet loaded</div>
+          <div style="font-size:12px;margin-top:6px;">Go back and upload a PDF</div>
+        </div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div id="eval-bottom">
+        <div id="page-nav-strip"></div>
+
+        <div class="btm-info">
+          <div class="btm-label">Ans.Book Count</div>
+          <div id="btm-bookcount">1/1</div>
+        </div>
+        <div class="btm-info">
+          <div class="btm-label">Page No.</div>
+          <div id="btm-pageno">—</div>
+        </div>
+        <div class="btm-info">
+          <div class="btm-label">Elapsed</div>
+          <div id="btm-elapsed" style="font-family:'JetBrains Mono',monospace;">00:00:00</div>
+        </div>
+
+        <!-- Zoom -->
+        <div class="zoom-row">
+          <button class="zm-btn" onclick="doZoom(-0.1)">−</button>
+          <div class="zm-disp" id="zm-disp">100%</div>
+          <button class="zm-btn" onclick="doZoom(+0.1)">+</button>
+        </div>
+
+        <!-- Mark size (scales ticks, crosses, stamps independently of zoom) -->
+        <div class="marksize-row" title="Scale the size of ticks, crosses and stamps">
+          <span class="ms-icon">✓ Size</span>
+          <input type="range" id="ms-slider" min="0.4" max="2.5" step="0.05" value="1"
+                 oninput="setAnnScale(this.value)">
+          <div class="ms-disp" id="ms-disp">100%</div>
+        </div>
+
+        <!-- Tools -->
+        <div class="tool-strip">
+          <button class="tool-btn t-tick active" data-tool="tick" onclick="selectTool('tick')">
+            <span class="tool-icon">✓</span> Tick
+          </button>
+          <button class="tool-btn t-cross" data-tool="cross" onclick="selectTool('cross')">
+            <span class="tool-icon">✗</span> Cross
+          </button>
+          <button class="tool-btn t-blank" data-tool="blank" onclick="selectTool('blank')">
+            <span class="tool-icon">⬜</span> Blank
+          </button>
+          <button class="tool-btn t-rough" data-tool="rough" onclick="selectTool('rough')">
+            <span class="tool-icon">📝</span> Rough
+          </button>
+          <button class="tool-btn t-delete" data-tool="delete" onclick="selectTool('delete')">
+            <span class="tool-icon">🗑</span> Del
+          </button>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="action-strip">
+          <button class="act-btn" onclick="openRightPanel('sol')" title="Marking Scheme">Sol.</button>
+          <button class="act-btn" onclick="openRightPanel('qp')" title="Question Paper">Q.P.</button>
+          <button class="act-btn green" onclick="openRemarksModal()" id="export-btn">
+            <span class="spinner" id="export-spinner" style="display:none"></span>
+            Export
+          </button>
+          <button class="act-btn" onclick="backToLanding()">UFM</button>
+          <button class="act-btn red-btn" onclick="backToLanding()">Exit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel (QP / Sol.) -->
+    <div id="right-panel">
+      <div id="rp-header">
+        <div id="rp-tabs">
+          <button class="rp-tab active" id="rp-tab-sol" onclick="switchRpTab('sol')">Sol.</button>
+          <button class="rp-tab" id="rp-tab-qp" onclick="switchRpTab('qp')">Q.P.</button>
+        </div>
+        <button id="rp-close" onclick="closeRightPanel()">×</button>
+      </div>
+      <div id="rp-content">
+        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;">
+          No document loaded
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MARK DROPDOWN -->
+<div id="mark-dropdown">
+  <div class="dd-header">Assign Mark</div>
+</div>
+
+<!-- REMARKS / EXPORT MODAL -->
+<div id="remarks-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>📤 Export Marked Script</h2>
+      <button class="modal-close" onclick="closeRemarksModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group-row">
+        <div class="form-group">
+          <label>Date of Examination</label>
+          <input type="text" id="exam-date-input" placeholder="e.g. 15 March 2025">
+        </div>
+        <div class="form-group">
+          <label>Date of Evaluation</label>
+          <input type="text" id="eval-date-input" placeholder="e.g. 20 March 2025">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Remarks</label>
+        <textarea id="remarks-input" placeholder="Any remarks about this answer script…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeRemarksModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="doExportPDF()">Export PDF</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+const state={
+  pdfDoc:null, qpDoc:null, solDoc:null,
+  totalPages:0, scale:1.0, annScale:1.0,
+  visitedPages:new Set(),
+  annotations:{},
+  currentTool:'tick',
+  questions:[],
+  nextQId:1,
+  pending:null,
+  evalList:[],
+  currentEval:null,
+  rpMode:null,          // 'sol' or 'qp'
+  startTime:null,
+  timerInterval:null,
+};
+let annIdCounter=0;
+const MARK_VALUES=[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5];
+const ANN={ TICK:38, CIRCLE_R:34, CIRCLE_FONT:24, CROSS_R:34, CROSS_ARM:16, STAMP_W:240, STAMP_H:72, STAMP_FONT:26, STROKE:5.5 };
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+document.getElementById('session-date').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+initQuestions(25);
+
+// ═══════════════════════════════════════
+//  LANDING
+// ═══════════════════════════════════════
+function showSection(s){
+  document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+function openNewEvalModal(){
+  document.getElementById('new-eval-modal').classList.add('show');
+}
+function closeNewEvalModal(){
+  document.getElementById('new-eval-modal').classList.remove('show');
+}
+document.getElementById('new-eval-modal').addEventListener('click',e=>{
+  if(e.target===e.currentTarget) closeNewEvalModal();
+});
+
+// ═══════════════════════════════════════
+//  UPLOAD ZONES
+// ═══════════════════════════════════════
+const uzFiles={};
+
+function uzSelect(zoneId,inputId){
+  const inp=document.getElementById(inputId);
+  const f=inp.files[0]; if(!f)return;
+  uzFiles[inputId]=f;
+  const zone=document.getElementById(zoneId);
+  zone.classList.add('has-file');
+  document.getElementById(zoneId+'-name').textContent=f.name;
+}
+function uzClear(e,zoneId,inputId){
+  e.preventDefault();e.stopPropagation();
+  uzFiles[inputId]=null;
+  document.getElementById(inputId).value='';
+  document.getElementById(zoneId).classList.remove('has-file');
+  document.getElementById(zoneId+'-name').textContent='No file selected';
+}
+function uzDrag(e,zoneId){e.preventDefault();document.getElementById(zoneId).classList.add('drag-over');}
+function uzLeave(zoneId){document.getElementById(zoneId).classList.remove('drag-over');}
+function uzDrop(e,zoneId,inputId){
+  e.preventDefault();
+  document.getElementById(zoneId).classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(!f||!f.name.endsWith('.pdf')){showToast('Please drop a PDF file');return;}
+  uzFiles[inputId]=f;
+  document.getElementById(zoneId).classList.add('has-file');
+  document.getElementById(zoneId+'-name').textContent=f.name;
+}
+
+// ═══════════════════════════════════════
+//  START EVALUATION
+// ═══════════════════════════════════════
+async function startEvaluation(){
+  const ansFile=uzFiles['answer-file'];
+  if(!ansFile){showToast('⚠️ Please upload an answer sheet PDF');return;}
+  const examName=document.getElementById('ne-exam-name').value.trim()||'Unnamed Exam';
+  const paperCode=document.getElementById('ne-paper-code').value.trim();
+  const subject=document.getElementById('ne-subject').value.trim();
+  const setNo=document.getElementById('ne-set').value.trim();
+  const label=examName+(setNo?' — '+setNo:'');
+
+  closeNewEvalModal();
+  setProgress(15);
+
+  // Load answer sheet
+  const buf=await ansFile.arrayBuffer();
+  await loadAnswerPDF(buf);
+
+  // Load QP / Sol. if provided
+  if(uzFiles['qp-file']){
+    const qpBuf=await uzFiles['qp-file'].arrayBuffer();
+    state.qpDoc=await pdfjsLib.getDocument({data:qpBuf}).promise;
+  }
+  if(uzFiles['ms-file']){
+    const msBuf=await uzFiles['ms-file'].arrayBuffer();
+    state.solDoc=await pdfjsLib.getDocument({data:msBuf}).promise;
+  }
+
+  // Store eval metadata
+  const evalEntry={
+    id:Date.now(),examName,paperCode,subject,setNo,
+    date:new Date().toLocaleDateString('en-GB'),
+    status:'In Progress',scriptId:'SCR-'+Math.random().toString(36).substr(2,6).toUpperCase(),
+  };
+  state.currentEval=evalEntry;
+  state.evalList.push(evalEntry);
+  updateEvalTable();
+  updateStats();
+
+  // Switch to eval view
+  document.getElementById('landing').style.display='none';
+  document.getElementById('eval-view').style.display='flex';
+  document.getElementById('etb-subject').textContent=`(${paperCode}) ${label}`;
+  document.getElementById('etb-scriptid').textContent='Script ID: '+evalEntry.scriptId;
+  document.getElementById('qp-scriptid').textContent=evalEntry.scriptId;
+
+  // Start timer
+  state.startTime=Date.now();
+  state.timerInterval=setInterval(updateTimer,1000);
+
+  // Reset Q panel
+  state.annotations={};state.visitedPages=new Set();
+  initQuestions(25);
+  setProgress(100);setTimeout(()=>setProgress(0),500);
+  showToast('✅ Evaluation started — '+label);
+}
+
+function backToLanding(){
+  if(state.timerInterval){clearInterval(state.timerInterval);state.timerInterval=null;}
+  if(state.currentEval) state.currentEval.status='In Progress';
+  updateEvalTable();
+  document.getElementById('eval-view').style.display='none';
+  document.getElementById('landing').style.display='flex';
+}
+
+function resumeEval(id){
+  const e=state.evalList.find(x=>x.id===id);
+  if(!e){showToast('Cannot resume — no PDF cached');return;}
+  showToast('⚠️ Re-upload the PDF to resume');
+}
+
+function updateEvalTable(){
+  const tb=document.getElementById('eval-list-tbody');
+  if(!state.evalList.length){
+    tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-light);">No evaluations yet.</td></tr>';
+    return;
+  }
+  tb.innerHTML=state.evalList.map((e,i)=>`
+    <tr>
+      <td class="num">${i+1}</td>
+      <td class="num">${e.paperCode||'—'}</td>
+      <td>${e.examName}${e.setNo?' — '+e.setNo:''}</td>
+      <td>${e.date}</td>
+      <td><span class="badge ${e.status==='Completed'?'badge-green':'badge-blue'}">${e.status}</span></td>
+      <td><button class="tbl-action-btn resume" onclick="resumeEval(${e.id})">Resume</button></td>
+    </tr>
+  `).join('');
+}
+
+function updateStats(){
+  const total=state.evalList.length;
+  const done=state.evalList.filter(e=>e.status==='Completed').length;
+  const inProg=state.evalList.filter(e=>e.status==='In Progress').length;
+  document.getElementById('stat-total').textContent=total;
+  document.getElementById('stat-completed').textContent=done;
+  document.getElementById('stat-pending').textContent=inProg;
+  document.getElementById('stat-rejected').textContent=0;
+}
+
+// ═══════════════════════════════════════
+//  QUESTIONS
+// ═══════════════════════════════════════
+function initQuestions(n=25){
+  state.questions=[];state.nextQId=1;
+  for(let i=1;i<=n;i++) _addQ();
+  renderQTable();updateTotal();
+}
+function addQuestion(){_addQ();renderQTable();updateTotal();}
+function _addQ(){
+  state.questions.push({id:state.nextQId++,label:`Q${state.questions.length+1}`,maxMarks:'',marks:''});
+}
+function removeLastQuestion(){
+  if(state.questions.length<=1)return;
+  state.questions.pop();renderQTable();updateTotal();
+}
+function renderQTable(){
+  const tb=document.getElementById('q-tbody'); tb.innerHTML='';
+  state.questions.forEach((q,i)=>{
+    const isFilled=q.marks!=='';
+    const marks=parseFloat(q.marks)||0;
+    const max=parseFloat(q.maxMarks)||0;
+    let stepsClass='none',stepsText='—';
+    if(isFilled){
+      const pct=max>0?marks/max:1;
+      if(pct>=1){stepsClass='green';stepsText=`${q.marks}/${q.maxMarks||'?'}`;}
+      else if(pct>0){stepsClass='amber';stepsText=`${q.marks}/${q.maxMarks||'?'}`;}
+      else{stepsClass='red';stepsText=`0/${q.maxMarks||'?'}`;}
+    }
+    const tr=document.createElement('tr');
+    if(isFilled) tr.classList.add('q-active');
+    tr.innerHTML=`
+      <td class="q-num-cell">${q.label}</td>
+      <td class="q-input-cell">
+        <input type="number" min="0" step="0.5" value="${q.maxMarks}" placeholder="—"
+          onchange="updateQ(${q.id},'maxMarks',this.value)">
+      </td>
+      <td class="q-input-cell">
+        <input type="number" min="0" step="0.5" value="${q.marks}" placeholder="—"
+          class="${isFilled?'filled':''}"
+          onchange="updateQ(${q.id},'marks',this.value)">
+      </td>
+      <td><span class="steps-cell ${stepsClass}">${stepsText}</span></td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+function updateQ(id,field,val){
+  const q=state.questions.find(x=>x.id===id);
+  if(q){q[field]=val;renderQTable();updateTotal();}
+}
+function updateTotal(){
+  let m=0,mx=0;
+  state.questions.forEach(q=>{
+    m+=parseFloat(q.marks)||0;
+    mx+=parseFloat(q.maxMarks)||0;
+  });
+  const fmt=v=>v%1===0?String(v):v.toFixed(1);
+  document.getElementById('total-disp').textContent=`${fmt(m)} / ${fmt(mx)}`;
+}
+
+// ═══════════════════════════════════════
+//  TIMER
+// ═══════════════════════════════════════
+function updateTimer(){
+  const elapsed=Math.floor((Date.now()-state.startTime)/1000);
+  const h=String(Math.floor(elapsed/3600)).padStart(2,'0');
+  const m=String(Math.floor((elapsed%3600)/60)).padStart(2,'0');
+  const s=String(elapsed%60).padStart(2,'0');
+  const t=`${h}:${m}:${s}`;
+  document.getElementById('etb-time').textContent=t;
+  document.getElementById('btm-elapsed').textContent=t;
+}
+
+// ═══════════════════════════════════════
+//  PDF LOADING
+// ═══════════════════════════════════════
+async function loadAnswerPDF(buf){
+  try{
+    setProgress(30);
+    const task=pdfjsLib.getDocument({data:buf});
+    state.pdfDoc=await task.promise;
+    state.totalPages=state.pdfDoc.numPages;
+    // Compute fit-width scale
+    const fp=await state.pdfDoc.getPage(1);
+    const vp0=fp.getViewport({scale:1});
+    const avail=document.getElementById('viewer-area').clientWidth-40;
+    state.scale=Math.min(1.4,Math.max(0.5,avail/vp0.width));
+    document.getElementById('empty-state').style.display='none';
+    buildPageNav();
+    await renderAllPages();
+    setProgress(100);
+  }catch(e){console.error(e);showToast('❌ Failed to load PDF');}
+}
+
+async function renderAllPages(){
+  const wrap=document.getElementById('pdf-scroll');
+  wrap.querySelectorAll('.page-wrapper').forEach(el=>el.remove());
+  for(let p=1;p<=state.totalPages;p++){
+    const page=await state.pdfDoc.getPage(p);
+    const vp=page.getViewport({scale:state.scale});
+    const wrapper=document.createElement('div');
+    wrapper.className='page-wrapper';wrapper.dataset.page=p;
+    wrapper.style.width=vp.width+'px';wrapper.style.height=vp.height+'px';
+    const canvas=document.createElement('canvas');
+    canvas.className='page-canvas';canvas.width=vp.width;canvas.height=vp.height;
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    wrapper.appendChild(canvas);
+    const svg=makeSVGEl('svg');
+    svg.setAttribute('class','ann-svg');
+    svg.setAttribute('width',vp.width);svg.setAttribute('height',vp.height);
+    svg.setAttribute('viewBox',`0 0 ${vp.width} ${vp.height}`);
+    wrapper.appendChild(svg);
+    // Events
+    wrapper.addEventListener('contextmenu',e=>{
+      e.preventDefault();
+      if(state.currentTool!=='tick')return;
+      const r=canvas.getBoundingClientRect();
+      state.pending={x:(e.clientX-r.left)/state.scale,y:(e.clientY-r.top)/state.scale,page:p};
+      showMarkDropdown(e.clientX,e.clientY);
+    });
+    wrapper.addEventListener('click',e=>{
+      hideDropdown();
+      if(e.target.closest('.ann-delete'))return;
+      const r=canvas.getBoundingClientRect();
+      const x=(e.clientX-r.left)/state.scale,y=(e.clientY-r.top)/state.scale;
+      if(state.currentTool==='cross') addAnnotation({type:'cross',x,y,page:p});
+      if(state.currentTool==='blank') addAnnotation({type:'blank',x,y,page:p});
+      if(state.currentTool==='rough') addAnnotation({type:'rough',x,y,page:p});
+    });
+    wrap.appendChild(wrapper);
+    renderAnnotationsForPage(p);
+    setProgress(30+60*(p/state.totalPages));
+  }
+  setupVisObserver();
+  updateZoomDisp();
+}
+
+async function doZoom(delta){
+  if(!state.pdfDoc)return;
+  const wrap=document.getElementById('pdf-scroll');
+  const scrollFrac=wrap.scrollTop/(wrap.scrollHeight||1);
+  state.scale=Math.max(0.3,Math.min(3.0,state.scale+delta));
+  for(let p=1;p<=state.totalPages;p++){
+    const wrapper=wrap.querySelector(`.page-wrapper[data-page="${p}"]`);
+    if(!wrapper)continue;
+    const page=await state.pdfDoc.getPage(p);
+    const vp=page.getViewport({scale:state.scale});
+    wrapper.style.width=vp.width+'px';wrapper.style.height=vp.height+'px';
+    const canvas=wrapper.querySelector('canvas');
+    canvas.width=vp.width;canvas.height=vp.height;
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    const svg=wrapper.querySelector('svg');
+    svg.setAttribute('width',vp.width);svg.setAttribute('height',vp.height);
+    svg.setAttribute('viewBox',`0 0 ${vp.width} ${vp.height}`);
+    renderAnnotationsForPage(p);
+  }
+  wrap.scrollTop=scrollFrac*wrap.scrollHeight;
+  updateZoomDisp();
+}
+function updateZoomDisp(){
+  document.getElementById('zm-disp').textContent=Math.round(state.scale*100)+'%';
+}
+
+function setAnnScale(v){
+  state.annScale=parseFloat(v);
+  document.getElementById('ms-disp').textContent=Math.round(state.annScale*100)+'%';
+  for(let p=1;p<=state.totalPages;p++) renderAnnotationsForPage(p);
+}
+
+function setupVisObserver(){
+  const wrap=document.getElementById('pdf-scroll');
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const p=parseInt(en.target.dataset.page);
+        state.visitedPages.add(p);
+        updatePageNav();
+        document.getElementById('btm-pageno').textContent=`${p}/${state.totalPages}`;
+      }
+    });
+  },{root:wrap,threshold:0.3});
+  wrap.querySelectorAll('.page-wrapper').forEach(w=>obs.observe(w));
+}
+
+// ═══════════════════════════════════════
+//  PAGE NAV
+// ═══════════════════════════════════════
+function buildPageNav(){
+  const nav=document.getElementById('page-nav-strip');nav.innerHTML='';
+  for(let i=1;i<=state.totalPages;i++){
+    const btn=document.createElement('div');
+    btn.className='pg-pill unvisited';btn.textContent=i;btn.dataset.page=i;
+    btn.onclick=()=>{
+      const w=document.getElementById('pdf-scroll').querySelector(`.page-wrapper[data-page="${i}"]`);
+      if(w) w.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+    nav.appendChild(btn);
+  }
+  document.getElementById('btm-bookcount').textContent=`1/${state.totalPages}`;
+}
+function updatePageNav(){
+  document.querySelectorAll('.pg-pill').forEach(btn=>{
+    const p=parseInt(btn.dataset.page);
+    btn.className='pg-pill';
+    btn.classList.add(state.visitedPages.has(p)?'visited':'unvisited');
+  });
+}
+
+// ═══════════════════════════════════════
+//  RIGHT PANEL (QP / Sol)
+// ═══════════════════════════════════════
+function openRightPanel(mode){
+  state.rpMode=mode;
+  document.getElementById('right-panel').classList.add('open');
+  switchRpTab(mode);
+}
+function closeRightPanel(){
+  document.getElementById('right-panel').classList.remove('open');
+  state.rpMode=null;
+}
+async function switchRpTab(mode){
+  state.rpMode=mode;
+  document.getElementById('rp-tab-sol').classList.toggle('active',mode==='sol');
+  document.getElementById('rp-tab-qp').classList.toggle('active',mode==='qp');
+  const doc=mode==='sol'?state.solDoc:state.qpDoc;
+  const content=document.getElementById('rp-content');
+  content.innerHTML='';
+  if(!doc){
+    content.innerHTML='<div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;">No PDF loaded for this panel.</div>';
+    return;
+  }
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p);
+    const vp=page.getViewport({scale:1.6});
+    const c=document.createElement('canvas');
+    c.width=vp.width;c.height=vp.height;
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    content.appendChild(c);
+  }
+}
+
+// ═══════════════════════════════════════
+//  TOOLS
+// ═══════════════════════════════════════
+function selectTool(tool){
+  state.currentTool=tool;
+  document.body.dataset.tool=tool;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
+  hideDropdown();
+}
+
+// ═══════════════════════════════════════
+//  ANNOTATIONS
+// ═══════════════════════════════════════
+function addAnnotation(ann){
+  ann.id=++annIdCounter;
+  if(!state.annotations[ann.page])state.annotations[ann.page]=[];
+  state.annotations[ann.page].push(ann);
+  renderAnnotationsForPage(ann.page);
+}
+function deleteAnnotation(id,page){
+  if(state.annotations[page]) state.annotations[page]=state.annotations[page].filter(a=>a.id!==id);
+  renderAnnotationsForPage(page);
+}
+function renderAnnotationsForPage(pageNum){
+  const wrap=document.getElementById('pdf-scroll');
+  const wrapper=wrap.querySelector(`.page-wrapper[data-page="${pageNum}"]`);
+  if(!wrapper)return;
+  const svg=wrapper.querySelector('svg');svg.innerHTML='';
+  const s=state.scale;
+  const as=s*(state.annScale||1); // annotation icon size, independent of zoom
+  (state.annotations[pageNum]||[]).forEach(ann=>{
+    const g=makeSVGEl('g');g.setAttribute('class','annotation-group');
+    const cx=ann.x*s,cy=ann.y*s;
+    if(ann.type==='tick')  drawTick(g,cx,cy,ann.mark,as);
+    if(ann.type==='cross') drawCross(g,cx,cy,as);
+    if(ann.type==='blank') drawStamp(g,cx,cy,'BLANK PAGE','#c62828',as);
+    if(ann.type==='rough') drawStamp(g,cx,cy,'ROUGH WORK','#e65100',as);
+    // Delete button
+    const dg=makeSVGEl('g');dg.setAttribute('class','ann-delete');
+    const dox=ann.type==='tick'?cx+ANN.TICK*as+ANN.CIRCLE_R*as+10
+             :ann.type==='cross'?cx+ANN.CROSS_R*as+10
+             :cx+ANN.STAMP_W/2*as+8;
+    const doy=ann.type==='tick'?cy-ANN.TICK*0.5*as
+             :ann.type==='cross'?cy-ANN.CROSS_R*as-8
+             :cy-ANN.STAMP_H/2*as-8;
+    dg.setAttribute('transform',`translate(${dox},${doy})`);
+    const dc=makeSVGEl('circle');dc.setAttribute('r','10');
+    dc.setAttribute('fill','#c62828');dc.setAttribute('stroke','#fff');dc.setAttribute('stroke-width','1.5');
+    dg.appendChild(dc);
+    const dt=makeSVGEl('text');
+    dt.setAttribute('text-anchor','middle');dt.setAttribute('dominant-baseline','central');
+    dt.setAttribute('fill','#fff');dt.setAttribute('font-size','12');dt.setAttribute('font-weight','bold');
+    dt.textContent='×';dg.appendChild(dt);
+    dg.style.cursor='pointer';
+    const aid=ann.id,pg=ann.page;
+    dg.addEventListener('click',e=>{e.stopPropagation();deleteAnnotation(aid,pg);});
+    g.appendChild(dg);
+    svg.appendChild(g);
+  });
+}
+
+function drawTick(g,cx,cy,mark,s){
+  // Reference: bold green tick INSIDE a green circle, mark value shown to the right separately
+  const r=ANN.CIRCLE_R*s;
+  const sw=ANN.STROKE*s;
+
+  // Circle (unfilled — white inside, green border like the reference image)
+  const circ=makeSVGEl('circle');
+  circ.setAttribute('cx',cx);circ.setAttribute('cy',cy);circ.setAttribute('r',r);
+  circ.setAttribute('fill','white');
+  circ.setAttribute('stroke','#00a86b');
+  circ.setAttribute('stroke-width',sw*0.9);
+  g.appendChild(circ);
+
+  // Tick INSIDE the circle
+  const ts=r*0.52; // scale tick to fit inside circle
+  const tick=makeSVGEl('polyline');
+  tick.setAttribute('points',
+    `${cx-ts*0.9},${cy+ts*0.05} ${cx-ts*0.15},${cy+ts*0.75} ${cx+ts*0.9},${cy-ts*0.75}`);
+  tick.setAttribute('stroke','#00a86b');
+  tick.setAttribute('stroke-width',sw*1.1);
+  tick.setAttribute('fill','none');
+  tick.setAttribute('stroke-linecap','round');
+  tick.setAttribute('stroke-linejoin','round');
+  g.appendChild(tick);
+
+  // Mark value shown to the right of the circle, in a small solid pill
+  const pr=ANN.CIRCLE_R*0.72*s;
+  const ox=cx+r+6*s+pr, oy=cy-r*0.6;
+  const pill=makeSVGEl('circle');
+  pill.setAttribute('cx',ox);pill.setAttribute('cy',oy);pill.setAttribute('r',pr);
+  pill.setAttribute('fill','#00a86b');pill.setAttribute('stroke','#005533');pill.setAttribute('stroke-width',sw*0.4);
+  g.appendChild(pill);
+  const ptxt=makeSVGEl('text');
+  ptxt.setAttribute('x',ox);ptxt.setAttribute('y',oy);
+  ptxt.setAttribute('text-anchor','middle');ptxt.setAttribute('dominant-baseline','central');
+  ptxt.setAttribute('fill','#ffffff');
+  ptxt.setAttribute('font-size',ANN.CIRCLE_FONT*0.85*s);
+  ptxt.setAttribute('font-weight','800');ptxt.setAttribute('font-family','monospace');
+  ptxt.textContent=String(mark);
+  g.appendChild(ptxt);
+}
+function drawCross(g,cx,cy,s){
+  // Reference: bold red X INSIDE a red circle, no external label
+  const r=ANN.CROSS_R*s;
+  const sw=ANN.STROKE*s;
+  const arm=r*0.52; // X arms sized to fit inside circle
+
+  // Circle (white fill, red border)
+  const circ=makeSVGEl('circle');
+  circ.setAttribute('cx',cx);circ.setAttribute('cy',cy);circ.setAttribute('r',r);
+  circ.setAttribute('fill','white');
+  circ.setAttribute('stroke','#c62828');
+  circ.setAttribute('stroke-width',sw*0.9);
+  g.appendChild(circ);
+
+  // X inside the circle
+  [[-1,-1,1,1],[1,-1,-1,1]].forEach(([x1,y1,x2,y2])=>{
+    const l=makeSVGEl('line');
+    l.setAttribute('x1',cx+x1*arm);l.setAttribute('y1',cy+y1*arm);
+    l.setAttribute('x2',cx+x2*arm);l.setAttribute('y2',cy+y2*arm);
+    l.setAttribute('stroke','#c62828');
+    l.setAttribute('stroke-width',sw*1.1);
+    l.setAttribute('stroke-linecap','round');
+    g.appendChild(l);
+  });
+}
+function drawStamp(g,cx,cy,label,color,s){
+  const bw=ANN.STAMP_W*s,bh=ANN.STAMP_H*s;
+  const bx=cx-bw/2,by=cy-bh/2;const corner=7*s,sw=ANN.STROKE*s;
+  const outer=makeSVGEl('rect');
+  outer.setAttribute('x',bx-4*s);outer.setAttribute('y',by-4*s);
+  outer.setAttribute('width',bw+8*s);outer.setAttribute('height',bh+8*s);
+  outer.setAttribute('rx',corner+3*s);outer.setAttribute('fill','none');
+  outer.setAttribute('stroke',color);outer.setAttribute('stroke-width',sw*0.5);outer.setAttribute('opacity','0.4');
+  g.appendChild(outer);
+  const rect=makeSVGEl('rect');
+  rect.setAttribute('x',bx);rect.setAttribute('y',by);
+  rect.setAttribute('width',bw);rect.setAttribute('height',bh);
+  rect.setAttribute('rx',corner);rect.setAttribute('fill',color+'20');
+  rect.setAttribute('stroke',color);rect.setAttribute('stroke-width',sw);
+  g.appendChild(rect);
+  const txt=makeSVGEl('text');
+  txt.setAttribute('x',cx);txt.setAttribute('y',cy);
+  txt.setAttribute('text-anchor','middle');txt.setAttribute('dominant-baseline','central');
+  txt.setAttribute('fill',color);txt.setAttribute('font-size',ANN.STAMP_FONT*s);
+  txt.setAttribute('font-weight','800');txt.setAttribute('font-family','sans-serif');
+  txt.setAttribute('letter-spacing','2');txt.textContent=label;
+  g.appendChild(txt);
+}
+function makeSVGEl(tag){return document.createElementNS('http://www.w3.org/2000/svg',tag);}
+
+// ═══════════════════════════════════════
+//  MARK DROPDOWN
+// ═══════════════════════════════════════
+function showMarkDropdown(cx,cy){
+  const dd=document.getElementById('mark-dropdown');
+  while(dd.children.length>1)dd.removeChild(dd.lastChild);
+  MARK_VALUES.forEach(v=>{
+    const item=document.createElement('div');item.className='dd-item';
+    item.innerHTML=`<span class="dd-dot"></span>${v}`;
+    item.onclick=()=>{
+      if(state.pending) addAnnotation({type:'tick',x:state.pending.x,y:state.pending.y,page:state.pending.page,mark:v});
+      hideDropdown();
+    };
+    dd.appendChild(item);
+  });
+  dd.style.display='block';
+  let left=cx+4,top=cy+4;
+  dd.style.left=left+'px';dd.style.top=top+'px';
+  requestAnimationFrame(()=>{
+    const r=dd.getBoundingClientRect();
+    if(r.right>window.innerWidth)dd.style.left=(cx-r.width-4)+'px';
+    if(r.bottom>window.innerHeight)dd.style.top=(cy-r.height-4)+'px';
+  });
+}
+function hideDropdown(){
+  document.getElementById('mark-dropdown').style.display='none';state.pending=null;
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#mark-dropdown')&&!e.target.closest('.page-wrapper'))hideDropdown();
+});
+
+// ═══════════════════════════════════════
+//  REMARKS / EXPORT
+// ═══════════════════════════════════════
+function openRemarksModal(){
+  if(!state.pdfDoc){showToast('⚠️ No PDF loaded');return;}
+  document.getElementById('remarks-modal').classList.add('show');
+}
+function closeRemarksModal(){document.getElementById('remarks-modal').classList.remove('show');}
+document.getElementById('remarks-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeRemarksModal();});
+
+async function doExportPDF(){
+  closeRemarksModal();
+  const btn=document.getElementById('export-btn');
+  const sp=document.getElementById('export-spinner');
+  btn.disabled=true;sp.style.display='inline-block';
+  try{
+    const {jsPDF}=window.jspdf;
+    const EXPORT_SCALE=2.0;
+    const examName=(state.currentEval?.examName||'Examination');
+    const paperCode=(state.currentEval?.paperCode||'');
+    const subject=(state.currentEval?.subject||'');
+    const examDate=document.getElementById('exam-date-input').value.trim();
+    const evalDate=document.getElementById('eval-date-input').value.trim();
+    const remarks=document.getElementById('remarks-input').value.trim();
+    let totalMarks=0,totalMax=0;
+    state.questions.forEach(q=>{totalMarks+=parseFloat(q.marks)||0;totalMax+=parseFloat(q.maxMarks)||0;});
+
+    // Render answer pages
+    const pdfPages=[];
+    for(let p=1;p<=state.totalPages;p++){
+      const page=await state.pdfDoc.getPage(p);
+      const vp=page.getViewport({scale:EXPORT_SCALE});
+      const off=document.createElement('canvas');off.width=vp.width;off.height=vp.height;
+      const ctx=off.getContext('2d');
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
+      (state.annotations[p]||[]).forEach(ann=>drawAnnCanvas(ctx,ann,EXPORT_SCALE));
+      pdfPages.push(off);
+    }
+
+    const PW=595.28,PH=841.89;
+    const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
+    buildCoverPage(doc,{examName,paperCode,subject,examDate,evalDate,remarks,totalMarks,totalMax,PW,PH});
+    pdfPages.forEach(canvas=>{
+      const pw=canvas.width/EXPORT_SCALE,ph=canvas.height/EXPORT_SCALE;
+      doc.addPage([pw,ph],pw>ph?'landscape':'portrait');
+      doc.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pw,ph);
+    });
+    const fname=(subject||examName||'Script').replace(/\s+/g,'_')+'_Marked.pdf';
+    doc.save(fname);
+    if(state.currentEval)state.currentEval.status='Completed';
+    updateEvalTable();updateStats();
+    showToast('✅ Export complete!');
+  }catch(err){console.error(err);showToast('❌ Export failed: '+err.message);}
+  btn.disabled=false;sp.style.display='none';
+}
+
+// ═══════════════════════════════════════
+//  COVER PAGE
+// ═══════════════════════════════════════
+function buildCoverPage(doc,{examName,paperCode,subject,examDate,evalDate,remarks,totalMarks,totalMax,PW,PH}){
+  const M=48,BLK=[0,0,0],GRY=[100,100,100],GRN=[0,140,90];
+  let y=M;
+  doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(...BLK);
+  doc.text(examName||'Examination',PW/2,y,{align:'center'});y+=10;
+  const tw=Math.min(doc.getTextWidth(examName||'Examination')+40,PW-M*2);
+  doc.setDrawColor(...BLK);doc.setLineWidth(1.2);
+  doc.line(PW/2-tw/2,y,PW/2+tw/2,y);y+=14;
+  if(paperCode){doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(...BLK);doc.text('Paper Code: '+paperCode,PW/2,y,{align:'center'});y+=14;}
+  if(subject){doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(...BLK);doc.text('Subject: '+subject,PW/2,y,{align:'center'});y+=16;}
+  doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(...BLK);
+  if(examDate)doc.text('Date of Examination: '+examDate,M,y);
+  if(evalDate)doc.text('Date of Evaluation: '+evalDate,PW-M,y,{align:'right'});
+  if(examDate||evalDate)y+=16;
+  doc.setDrawColor(...BLK);doc.setLineWidth(0.7);doc.line(M,y,PW-M,y);y+=14;
+  const qs=state.questions,NUM_COLS=Math.min(3,Math.ceil(qs.length/10));
+  const COL_W=(PW-M*2)/NUM_COLS,ROW_H=17,PER=10;
+  const Q_COL=34,MX_COL=38,MK_COL=38;
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...BLK);
+  for(let c=0;c<NUM_COLS;c++){
+    const x0=M+c*COL_W;
+    doc.text('Q. No',x0,y);doc.text('Max',x0+Q_COL+MX_COL,y,{align:'right'});doc.text('Obtained',x0+Q_COL+MX_COL+MK_COL+6,y,{align:'right'});
+  }
+  y+=5;doc.setDrawColor(180,180,180);doc.setLineWidth(0.3);doc.line(M,y,PW-M,y);y+=4;
+  const rY=y;
+  for(let c=0;c<NUM_COLS;c++){
+    const x0=M+c*COL_W;let ry=rY;
+    qs.slice(c*PER,c*PER+PER).forEach(q=>{
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(...BLK);
+      doc.text(q.label,x0,ry);doc.text(q.maxMarks!==''?String(q.maxMarks):'\u2014',x0+Q_COL+MX_COL,ry,{align:'right'});
+      if(q.marks!==''){doc.setFont('helvetica','bold');doc.setTextColor(...GRN);}else{doc.setFont('helvetica','normal');doc.setTextColor(...GRY);}
+      doc.text(q.marks!==''?String(q.marks):'\u2014',x0+Q_COL+MX_COL+MK_COL+6,ry,{align:'right'});
+      ry+=ROW_H;
+    });
+  }
+  y=rY+Math.ceil(qs.length/NUM_COLS)*ROW_H+6;
+  doc.setDrawColor(...BLK);doc.setLineWidth(0.7);doc.line(M,y,PW-M,y);y+=16;
+  const fmtN=v=>v%1===0?String(v):v.toFixed(1);const hx=PW/2;
+  doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(...BLK);
+  doc.text('Marks Obtained:',M,y);doc.setFont('helvetica','bold');doc.setTextColor(...GRN);doc.text(fmtN(totalMarks),M+98,y);y+=17;
+  doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(...BLK);
+  doc.text('Maximum Marks:',M,y);doc.setFont('helvetica','normal');doc.setTextColor(...BLK);doc.text(fmtN(totalMax),M+98,y);
+  if(remarks){
+    const ry0=y-17;doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(...BLK);doc.text('Remarks:',hx+10,ry0);
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+    doc.text(doc.splitTextToSize(remarks,PW-hx-M-10),hx+10,ry0+13);
+  }
+  doc.setFont('helvetica','italic');doc.setFontSize(7.5);doc.setTextColor(160,160,160);
+  doc.text('Generated by OSM \u2022 On-Screen Marking System',PW/2,PH-20,{align:'center'});
+}
+
+function drawAnnCanvas(ctx,ann,s){
+  const cx=ann.x*s,cy=ann.y*s;
+  const s2=s*(state.annScale||1); // icon size, kept independent of position scale
+  if(ann.type==='tick'){
+    const r=ANN.CIRCLE_R*s2, sw=ANN.STROKE*s2;
+    // White circle with green border
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle='white';ctx.fill();
+    ctx.strokeStyle='#00a86b';ctx.lineWidth=sw*0.9;ctx.stroke();
+    // Tick inside circle
+    const ts=r*0.52;
+    ctx.strokeStyle='#00a86b';ctx.lineWidth=sw*1.1;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();
+    ctx.moveTo(cx-ts*0.9, cy+ts*0.05);
+    ctx.lineTo(cx-ts*0.15, cy+ts*0.75);
+    ctx.lineTo(cx+ts*0.9, cy-ts*0.75);
+    ctx.stroke();
+    // Mark pill to the right
+    const pr=ANN.CIRCLE_R*0.72*s2;
+    const ox=cx+r+6*s2+pr, oy=cy-r*0.6;
+    ctx.beginPath();ctx.arc(ox,oy,pr,0,Math.PI*2);
+    ctx.fillStyle='#00a86b';ctx.fill();
+    ctx.strokeStyle='#005533';ctx.lineWidth=sw*0.4;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font=`800 ${ANN.CIRCLE_FONT*0.85*s2}px monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(ann.mark),ox,oy);
+  }else if(ann.type==='cross'){
+    const r=ANN.CROSS_R*s2, sw=ANN.STROKE*s2;
+    const arm=r*0.52;
+    // White circle with red border
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle='white';ctx.fill();
+    ctx.strokeStyle='#c62828';ctx.lineWidth=sw*0.9;ctx.stroke();
+    // X inside circle
+    ctx.strokeStyle='#c62828';ctx.lineWidth=sw*1.1;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(cx-arm,cy-arm);ctx.lineTo(cx+arm,cy+arm);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+arm,cy-arm);ctx.lineTo(cx-arm,cy+arm);ctx.stroke();
+  }else if(ann.type==='blank'||ann.type==='rough'){
+    const color=ann.type==='blank'?'#c62828':'#e65100';
+    const label=ann.type==='blank'?'BLANK PAGE':'ROUGH WORK';
+    const bw=ANN.STAMP_W*s2,bh=ANN.STAMP_H*s2;
+    const bx=cx-bw/2,by=cy-bh/2;const corner=7*s2,sw=ANN.STROKE*s2;
+    ctx.strokeStyle=color;ctx.lineWidth=sw*0.5;ctx.globalAlpha=0.4;
+    _rr(ctx,bx-4*s2,by-4*s2,bw+8*s2,bh+8*s2,corner+3*s2);ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle=color+'20';_rr(ctx,bx,by,bw,bh,corner);ctx.fill();
+    ctx.strokeStyle=color;ctx.lineWidth=sw;_rr(ctx,bx,by,bw,bh,corner);ctx.stroke();
+    ctx.fillStyle=color;ctx.font=`800 ${ANN.STAMP_FONT*s2}px sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,cx,cy);
+  }
+}
+function _rr(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
+// ═══════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(!state.pdfDoc)return;
+  switch(e.key){
+    case'+':case'=':doZoom(+0.1);break;
+    case'-':doZoom(-0.1);break;
+    case't':selectTool('tick');break;
+    case'x':selectTool('cross');break;
+    case'b':selectTool('blank');break;
+    case'r':selectTool('rough');break;
+    case'd':selectTool('delete');break;
+    case'Escape':hideDropdown();break;
+  }
+});
+
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+function showToast(msg,dur=2800){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(showToast._t);showToast._t=setTimeout(()=>t.classList.remove('show'),dur);
+}
+function setProgress(p){document.getElementById('progress-bar').style.width=p+'%';}
+</script>
+</body>
+</html>
